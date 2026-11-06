@@ -377,6 +377,7 @@ h2:before{content:"";flex-shrink:0;width:22px;height:12px;background:var(--pink)
 .fcv{display:block;width:100%;height:340px;border-radius:8px;border:1px solid var(--line);background:var(--surface);touch-action:manipulation}
 .is-desktop .fcv{height:460px}
 .fctl{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.impbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-left:4px solid var(--green)}.impbar>div{flex:1;min-width:200px}
 .coach{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(760px,calc(100% - 20px));z-index:40;background:var(--surface);border:1px solid var(--line);outline:1px solid var(--line);outline-offset:-5px;border-radius:6px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:13px;max-height:30vh;overflow:auto}
 .coach h4{margin:0 30px 2px 0;font-family:var(--fh);font-size:16px;font-weight:700}
 .coach .cx{position:absolute;right:8px;top:6px;border:0;background:transparent;font-size:20px;color:var(--muted);padding:4px 8px}
@@ -459,6 +460,7 @@ h2:before{content:"";flex-shrink:0;width:22px;height:12px;background:var(--pink)
     <button class="tab" data-tab="ext">9 · 11 · 13</button>
     <button class="tab" data-tab="voicing">Voicing</button>
     <span class="navh">L'harmonie</span>
+    <button class="tab" data-tab="harm">Cours d'harmonie</button>
     <button class="tab" data-tab="deg">Degrés</button>
     <button class="tab" data-tab="keys">Tonalités</button>
     <button class="tab" data-tab="modes">Modes</button>
@@ -472,6 +474,7 @@ h2:before{content:"";flex-shrink:0;width:22px;height:12px;background:var(--pink)
     <span class="navh">La pratique</span>
     <button class="tab" data-tab="impro">Improviser</button>
     <button class="tab" data-tab="train">Entraîner</button>
+    <button class="tab" data-tab="voice">Accompagner une voix</button>
     <button class="tab" data-tab="mic">Test micro</button>
   </nav>
   <span id="sndb" class="sndb"></span>
@@ -602,7 +605,7 @@ const INST={
  strings:{n:'Cordes',i:'🎻',d:'Ensemble de cordes avec vibrato, attaque douce.',g:'Musique de film, ballades, épique'},
  celesta:{n:'Boîte à musique',i:'🔔',d:'Petites cloches cristallines.',g:'Berceuses, Noël, merveilleux'},
  vibes:{n:'Vibraphone',i:'🎐',d:'Lames de métal avec trémolo, très jazz.',g:'Jazz cool, bossa, lounge'}};
-const INSTREC={pop:['grand','rhodes'],classique:['grand','harpsi'],jazz:['grand','rhodes','vibes'],city:['rhodes','synth80'],gospel:['organ','grand'],blues:['upright','organ'],bossa:['rhodes','vibes'],film:['strings','pad','grand']};
+const INSTREC={pop:['grand','rhodes'],classique:['grand','harpsi'],jazz:['grand','rhodes','vibes'],city:['rhodes','synth80'],gospel:['organ','grand'],blues:['upright','organ'],bossa:['rhodes','vibes'],film:['strings','pad','grand'],anime:['grand','strings','synth80'],cartoon:['upright','celesta','strings'],game:['synth80','celesta','pad']};
 S.inst='grand';S.instOpen=false;
 function env(g,t,a,peak,rel,relT){g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+a);return g;}
 function osc(c,type,f,t,stop,dest,gain,det=0){const o=c.createOscillator();o.type=type;o.frequency.value=f;o.detune.value=det;const g=c.createGain();g.gain.value=gain;o.connect(g).connect(dest);o.start(t);o.stop(stop);return o;}
@@ -1497,20 +1500,23 @@ function segSteps(a,beats,tag){if(S.arp!=='auto'){const{rh,b}=a;return applyArp(
   return out;}
 function formOrder(song){if(Array.isArray(song.form)&&song.form.length){const ix=song.form.map(n=>song.sections.findIndex(s=>s.name===n)).filter(i=>i>=0);if(ix.length)return ix;}return song.sections.map((_,i)=>i);}
 function barSteps(song,arr,si,bi){return handFilter(barSteps0(song,arr,si,bi));}
-function barSteps0(song,arr,si,bi){const sec0=song.sections[si];if(S.sRhy==='score'&&Array.isArray(sec0.rhy)&&RPAT[sec0.rhy[bi]])return scoreBarSteps(song,arr,si,bi);const bpb=song.beatsPerBar||4,chs=splitBar(song.sections[si].bars[bi]);if(!chs.length)return[{d:bpb,tag:`${si}-${bi}`}];
+function barSteps0(song,arr,si,bi){const sec0=song.sections[si];if(S.sRhy==='notes'&&song.notes)return notesBarSteps(song,si,bi);if(S.sRhy==='score'&&Array.isArray(sec0.rhy)&&RPAT[sec0.rhy[bi]])return scoreBarSteps(song,arr,si,bi);const bpb=song.beatsPerBar||4,chs=splitBar(song.sections[si].bars[bi]);if(!chs.length)return[{d:bpb,tag:`${si}-${bi}`}];
   return chs.flatMap((s,ci)=>{const a=arr[`${si}-${bi}-${ci}`];return a?segSteps(a,bpb/chs.length,`${si}-${bi}`):[{d:bpb/chs.length,tag:`${si}-${bi}`}];});}
 function songSteps(song,arr){const st=[];formOrder(song).forEach(si=>{const sec=song.sections[si];for(let r=0;r<(sec.repeat||1);r++)(sec.bars||[]).forEach((_,bi)=>st.push(...barSteps(song,arr,si,bi)));});return st;}
 
-async function loadSaved(){if(!STORE.ok){if(!S.saved.some(x=>x.id==='sept'))S.saved.push(JSON.parse(JSON.stringify(SEPT)));return;}
+async function loadSaved(){if(!STORE.ok){if(!S.saved.some(x=>x.id==='sept'))S.saved.push(JSON.parse(JSON.stringify(SEPT)));if(!S.saved.some(x=>x.id==='npark'))S.saved.unshift({...NPARK,notes:npNotes()});return;}
   try{const r=await STORE.get('songs:list',false);S.saved=r?JSON.parse(r.value):[];}catch(e){S.saved=[];}
-  try{const r=await STORE.get('songs:prefs',false);if(r){const p=JSON.parse(r.value);S.songPrefs=p.songs||{};S.hidePreset=!!p.hidePreset;S.septAdded=!!p.septAdded;if(p.arp)S.arp=p.arp;S.coachOff=!!p.coachOff;if(p.inst&&INST[p.inst])S.inst=p.inst;if(p.layout)S.layout=p.layout;badge();applyLayout();}}catch(e){}
+  try{const r=await STORE.get('songs:prefs',false);if(r){const p=JSON.parse(r.value);S.songPrefs=p.songs||{};S.hidePreset=!!p.hidePreset;S.septAdded=!!p.septAdded;S.npAdded=!!p.npAdded;if(p.arp)S.arp=p.arp;S.coachOff=!!p.coachOff;if(p.inst&&INST[p.inst])S.inst=p.inst;if(p.layout)S.layout=p.layout;badge();applyLayout();}}catch(e){}
   S.saved=S.saved.map(x=>x.id==='sept'&&!hasScoreRhy(x)?{...x,sections:JSON.parse(JSON.stringify(SEPT.sections)),form:SEPT.form,note:SEPT.note}:x);
+  S.saved=S.saved.map(x=>x.id==='npark'&&x.version!==NPARK.version?{...NPARK,notes:npNotes()}:x);
+  {const RM=['ballade','blues','neons','brise','gardien','ciel','rag','chip','collines'].map(x=>'full-'+x);if(S.saved.some(x=>RM.includes(x.id))){S.saved=S.saved.filter(x=>!RM.includes(x.id));persist();}}
+  if(!S.npAdded&&!S.saved.some(x=>x.id==='npark')){S.saved.unshift({...NPARK,notes:npNotes()});S.npAdded=true;persist();savePrefs();}
   if(!S.septAdded&&!S.saved.some(x=>x.id==='sept')){S.saved.push(JSON.parse(JSON.stringify(SEPT)));S.septAdded=true;persist();savePrefs();}
   if(S.hidePreset&&S.song===PRESET)S.song=S.saved[0]||null;if(S.song)applyPrefs(S.song);}
 S.songPrefs={};S.hidePreset=false;S.delAsk=null;
-function applyPrefs(sg){const p=S.songPrefs[sg.id];S.sTr=p?p.tr:0;S.sBpm=p?p.bpm:Math.min(140,Math.max(50,+sg.bpm||80));if(p){S.sv=p.sv;S.sRhy=p.rhy;}if(hasScoreRhy(sg)&&(!p||!p.rhy||p.rhy==='ballade'))S.sRhy='score';S.sSel=null;}
+function applyPrefs(sg){const p=S.songPrefs[sg.id];S.sTr=p?p.tr:0;S.sBpm=p?p.bpm:Math.min(140,Math.max(50,+sg.bpm||80));if(p){S.sv=p.sv;S.sRhy=p.rhy;}if(hasScoreRhy(sg)&&(!p||!p.rhy||p.rhy==='ballade'))S.sRhy='score';if(sg.notes&&(!p||!p.rhy||p.rhy==='ballade'))S.sRhy='notes';if(sg.notes&&(!p||!p.rhy||p.rhy==='ballade'))S.sRhy='notes';S.sSel=null;}
 function savePrefs(){if(S.song)S.songPrefs[S.song.id]={tr:S.sTr,bpm:S.sBpm,sv:S.sv,rhy:S.sRhy};
-  try{if(STORE.ok)STORE.set('songs:prefs',JSON.stringify({songs:S.songPrefs,hidePreset:S.hidePreset,septAdded:S.septAdded,arp:S.arp,coachOff:S.coachOff,inst:S.inst,layout:S.layout}));}catch(e){}}
+  try{if(STORE.ok)STORE.set('songs:prefs',JSON.stringify({songs:S.songPrefs,hidePreset:S.hidePreset,septAdded:S.septAdded,npAdded:S.npAdded,arp:S.arp,coachOff:S.coachOff,inst:S.inst,layout:S.layout}));}catch(e){}}
 function repHTML(){const items=[...(S.hidePreset?[]:[{k:'preset',t:'Evidências',id:'evid'}]),...S.saved.map((x,i)=>({k:String(i),t:x.title,a:x.artist,id:x.id}))];
   if(!items.length)return`<p class="small">Ton répertoire est vide : cherche une chanson ci-dessus.</p>`;
   return`<div class="small" style="margin-top:10px">Mon répertoire</div><div class="rep">${items.map(x=>`<span class="repi ${S.song&&S.song.id===x.id?'on':''}"><button class="repn" data-song="${x.k}">${x.t}${x.a?`<small>${x.a}</small>`:''}</button>${S.delAsk===x.k
@@ -1520,27 +1526,28 @@ function repHTML(){const items=[...(S.hidePreset?[]:[{k:'preset',t:'Evidências'
 async function persist(){try{if(STORE.ok)await STORE.set('songs:list',JSON.stringify(S.saved));}catch(e){}}
 function songsHead(){return `<section class="hero"><div class="pix">ton répertoire</div><h1>Tes grilles,<br><span class="p">au piano</span></h1>
   <p class="lead">Note la grille d'accords d'une chanson (trouvée dans un recueil ou sur un site d'accords) : l'app te l'arrange au piano, en solo ou pour accompagner ta voix, dans la tonalité de ton choix.</p></section>
+  ${importBar()}
   <div class="card">${repHTML()}<button class="chip" style="margin-top:10px" data-act="songNewToggle">${S.songForm?'Fermer le formulaire':'➕ Ajouter une grille'}</button>
    ${S.songForm?`${importHTML()}<div class="sform"><label>Titre<input id="sf_t" value="${(S.sf.t||'').replace(/"/g,'&quot;')}" placeholder="ex. Let It Be"></label><label>Artiste<input id="sf_a" value="${(S.sf.a||'').replace(/"/g,'&quot;')}" placeholder="ex. The Beatles"></label>
     <div class="row" style="margin:0"><label style="flex:1">Tonalité<input id="sf_k" value="${(S.sf.k||'').replace(/"/g,'&quot;')}" placeholder="ex. C ou Am"></label><label style="flex:1">Tempo<input id="sf_b" inputmode="numeric" value="${S.sf.b||80}"></label></div>
     ${qpadHTML()}<label>Grille<textarea id="sf_g" rows="7" placeholder="Intro: C | G | Am | F&#10;Couplet: C G | Am F | C | G&#10;Refrain x2: F | C | G | Am">${S.sf.g||''}</textarea></label>
     <p class="small">Une section par ligne : son nom, deux-points, puis les mesures séparées par « | ». Deux accords dans une mesure : sépare-les par un espace. Ajoute « x2 » au nom pour répéter. Notation anglaise (C, F#m7, Bb/D) ou française (Do, Fa#m7).</p>
     ${S.sfErr?`<p class="small" style="color:var(--pink)">${S.sfErr}</p>`:''}<button class="btn" data-act="songSave">Enregistrer la grille</button></div>`:''}
-   <p class="small" style="margin-top:8px">Tes grilles sont enregistrées sur cet appareil.</p></div>`;}
+   <p class="small" style="margin-top:8px">Tes grilles sont enregistrées sur cet appareil.</p></div>${fullLibHTML()}`;}
 function parseGrid(txt){const secs=[];String(txt).split(/\n+/).map(l=>l.trim()).filter(Boolean).forEach((l,i)=>{let name='Section '+(i+1),body=l;const m=l.match(/^([^:|]+):(.*)$/);if(m){name=m[1].trim();body=m[2];}
    let rep=1;const rx=name.match(/\s*[x×](\d+)\s*$/i);if(rx){rep=+rx[1];name=name.replace(rx[0],'').trim();}
    const bars=body.split('|').map(b=>b.trim().split(/\s+/).filter(Boolean).map(frToEn).join(' ')).filter(Boolean);if(bars.length)secs.push({name,repeat:rep,bars});});return secs;}
 function renderSongs(){const song=S.song;if(!song)return songsHead()+`<div class="card center"><p><b>Aucun morceau ouvert.</b></p><p class="small">Ajoute une grille avec le formulaire ci-dessus, ou rétablis l'exemple.</p></div>`;
   const vsw=`<div class="row" style="justify-content:center;margin-top:14px"><div class="seg"><button data-sview="play" class="${S.songView==='play'||!S.songView?'on':''}">🎹 Jouer le morceau</button><button data-sview="master" class="${S.songView==='master'?'on':''}">🎯 Maîtriser</button><button data-sview="follow" class="${S.songView==='follow'?'on':''}">🎙️ Suivre</button></div></div>`;
   if(S.songView==='master')return songsHead()+vsw+masterHTML(song);
-  if(S.songView==='follow'){if(S.fol.songId!==song.id+':'+S.fol.gran)folBuild();return songsHead()+vsw+followHTML(song);}
+  if(S.songView==='follow'){if(S.fol.songId!==song.id+':'+S.fol.gran){folBuild();if(S.fol.ev[0])S.fol.t=S.fol.ev[0].t-2;}return songsHead()+vsw+followHTML(song);}
   const arr=arrange(song),fl=prefFlat(song);
   const sel=S.sSel||'0-0',[ssi,sbi]=sel.split('-').map(Number);const st0=barSteps(song,arr,ssi,sbi).find(x=>x.show);
   const curName=splitBar(song.sections[ssi].bars[sbi]).map(s=>trSym(s,song)).join(' · ');
   const uniq=[],seen=new Set();song.sections.forEach((sec,si)=>sec.bars.forEach((bar,bi)=>splitBar(bar).forEach((sym,ci)=>{const n=trSym(sym,song),a=arr[`${si}-${bi}-${ci}`];
     if(a&&!seen.has(n)){seen.add(n);const s=segSteps(a,4,'x').find(x=>x.show).show;uniq.push({n,s});}})));
   const trLabel=S.sTr===0?'tonalité d\'origine':(S.sTr>0?'+':'')+S.sTr+' demi-ton'+(Math.abs(S.sTr)>1?'s':'');
-  const rhyN={...(hasScoreRhy(song)?{score:'📜 Rythme de la partition'}:{}),...(S.sv==='solo'?{ballade:'Ballade (arpège MG)',arpege:'Arpège deux mains',plaque:'Plaqué riche'}:{ballade:'Ballade 3-3-2',arpege:'Arpège doux',plaque:'Plaqué'})};if(S.sRhy==='score'&&!hasScoreRhy(song))S.sRhy='ballade';
+  const rhyN={...(song.notes?{notes:'🎼 Notes de la partition'}:{}),...(hasScoreRhy(song)?{score:'📜 Rythme de la partition'}:{}),...(S.sv==='solo'?{ballade:'Ballade (arpège MG)',arpege:'Arpège deux mains',plaque:'Plaqué riche'}:{ballade:'Ballade 3-3-2',arpege:'Arpège doux',plaque:'Plaqué'})};if(S.sRhy==='score'&&!hasScoreRhy(song))S.sRhy='ballade';if(S.sRhy==='notes'&&!song.notes)S.sRhy='ballade';
   return songsHead()+vsw+handsSeg()+`
 
   <div class="card"><h2 style="margin:0">${song.title}</h2><p class="small">${song.artist||''}${song.version?' · '+song.version:''}</p>
@@ -2495,7 +2502,7 @@ const NOTE_RE_FR=/(^|[\s·/(→–])(Do|Ré|Mi|Fa|Sol|La|Si)([♯♭]?)(?=$|[\s�
 function trLabel(lab,o){if(!lab||!o)return lab;const fl=gFlat(),FRP={Do:0,'Ré':2,Mi:4,Fa:5,Sol:7,La:9,Si:11};
   const name=pc=>nm(parse((fl?FLAT:SHARP)[mod(pc)]));
   return String(lab).replace(NOTE_RE_FR,(m,p,n,a)=>p+name(FRP[n]+(a==='♯'?1:a==='♭'?-1:0)+o)).replace(NOTE_RE_EN,(m,p,n,a)=>p+name(LPC[n]+(a==='#'||a==='♯'?1:a==='b'||a==='♭'?-1:0)+o));}
-function trSteps(steps,o){return steps&&steps.map(s=>({...s,lh:s.lh&&s.lh.map(m=>m+o),rh:s.rh&&s.rh.map(m=>m+o),show:s.show&&{lh:(s.show.lh||[]).map(m=>m+o),rh:(s.show.rh||[]).map(m=>m+o)},label:trLabel(s.label,o)}));}
+function trSteps(steps,o){return steps&&steps.map(s=>({...s,ev:s.ev&&s.ev.map(e=>[e[0]+o,...e.slice(1)]),lh:s.lh&&s.lh.map(m=>m+o),rh:s.rh&&s.rh.map(m=>m+o),show:s.show&&{lh:(s.show.lh||[]).map(m=>m+o),rh:(s.show.rh||[]).map(m=>m+o)},label:trLabel(s.label,o)}));}
 function trSymOff(sym,o){if(!o)return sym;const m=String(sym).match(/^([A-G][#b]?)(.*?)(?:\/([A-G][#b]?))?$/);if(!m)return sym;const fl=gFlat(),f=n=>(fl?FLAT:SHARP)[mod(parse(n).pc+o)];return f(m[1])+m[2]+(m[3]?'/'+f(m[3]):'');}
 function artOff(syms){if(S.gkOrig)return 0;const c=parseChord(syms[0]);if(!c)return 0;const tgt=c.ints.includes(3)&&!c.ints.includes(4)?mod(gpc()-3):gpc();let o=mod(tgt-c.root);if(o>6)o-=12;return o;}
 
@@ -2625,14 +2632,16 @@ function renderImpro(){const I=S.imp,G=IGEN[I.g];if(!I.prog)genProg();if(I.syms&
    ['Copier la machine','Génère une mélodie, écoute-la deux fois, puis rejoue-la de mémoire et change sa fin.'],
    ['Respirer','Une bonne impro, c\'est 50 % de silence. Laisse au moins une mesure vide sur deux.']].map(([t,d],i)=>`<div class="tip ${['','p','b'][i%3]}"><b>Étape ${i+1} · ${t}</b>${d}</div>`).join('')}</div>
 
-  <h2>5 · Les licks du genre</h2>${legend}
+  ${runsHTML()}
+  <h2>6 · Les licks du genre</h2>${legend}
   <div class="g2">${GX[I.g].licks.map(L=>exCard({keyAware:1,tag:'Lick',title:L.n,desc:L.d,bpm:84,steps:lickSteps(L),display:'all',extra:lickExtra(L)})).join('')}</div>
 
-  <h2>6 · Les notes, en théorie</h2>
+  ${improPlusHTML()}
+  <h2>Les notes, en théorie</h2>
   <div class="card"><div class="tip"><b>Les notes sûres</b>Les notes de l'accord (1, 3, 5, 7) sonnent toujours justes sur les temps forts.</div>
    <div class="tip p"><b>Les notes de couleur</b>9, 11, 13 enrichissent l'accord : pose-toi dessus pour un son jazz, city pop ou neo-soul.</div>
    <div class="tip b"><b>La note à éviter</b>Sur un accord majeur ou de dominante, la 4te (11 naturelle) tenue longtemps frotte avec la tierce. Utilise-la en passant, pas en appui.</div>
-   <div class="tip"><b>La gamme du genre</b>${{pop:'Pentatonique majeure',classique:'Gamme majeure',jazz:'Majeure + notes chromatiques (bebop)',city:'Majeure avec 9e et approches chromatiques',gospel:'Pentatonique majeure + ♭3',blues:'Gamme blues',bossa:'Majeure, appuis sur 9 et 13',film:'Mineur naturel'}[I.g]}, affichée en jaune sur le clavier.</div></div>`;}
+   <div class="tip"><b>La gamme du genre</b>${{pop:'Pentatonique majeure',classique:'Gamme majeure',jazz:'Majeure + notes chromatiques (bebop)',city:'Majeure avec 9e et approches chromatiques',gospel:'Pentatonique majeure + ♭3',blues:'Gamme blues',bossa:'Majeure, appuis sur 9 et 13',film:'Mineur naturel',anime:'Pentatonique majeure (et gamme majeure)',cartoon:'Majeure avec chromatismes (et lydien pour la magie)',game:'Mineur naturel (éolien)'}[I.g]}, affichée en jaune sur le clavier.</div></div>`;}
 
 
 /* ============ PAGE: AIDE 9 · 11 · 13 ============ */
@@ -2902,7 +2911,7 @@ function renderSim(){const Sm=S.sim,info=simInfo(Sm.sel),mk={};
 /* ============ PÉDAGOGIE : XP, niveaux, série, badges ============ */
 S.ped={mode:'adult',xp:0,streak:0,last:'',today:'',todayOk:0,missions:[],perfect:0};
 const PLVL=[[0,'Promeneur','🌱'],[100,'Curieux','🌿'],[300,'Jardinier','🌳'],[600,'Paysagiste','🌸'],[1000,'Musicien du kiosque','🎼'],[1600,'Architecte du parc','🏛️'],[2500,'Maestro','🦢']];
-async function loadPed(){try{if(!STORE.ok)return;const r=await STORE.get('ped:state');if(r)Object.assign(S.ped,JSON.parse(r.value));}catch(e){}}
+async function loadPed(){try{if(!STORE.ok)return;const r=await STORE.get('ped:state');if(r)Object.assign(S.ped,JSON.parse(r.value));if(S.ped.voice)S.vo.ok=S.ped.voice;}catch(e){}}
 function savePed(){try{if(STORE.ok)STORE.set('ped:state',JSON.stringify(S.ped));}catch(e){}}
 const dstr=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 function pedLevel(){const x=S.ped.xp;let i=0;PLVL.forEach((l,k)=>{if(x>=l[0])i=k;});const cur=PLVL[i],nx=PLVL[i+1];return{i,name:cur[1],icon:cur[2],pct:nx?Math.round((x-cur[0])/(nx[0]-cur[0])*100):100,next:nx?nx[0]-x:0,nextName:nx?nx[1]:''};}
@@ -3115,7 +3124,7 @@ const MEMOS={
  v_i:['➡️','La cadence','Le V veut aller vers le I : la sensible monte d\'un demi-ton vers la tonique.'],ecoute:['👂','Écouter','Écoute le morceau 3 fois avant de le travailler : l\'oreille guide les doigts.'],
  arpege:['🌊','Arpèges','Plaque d\'abord l\'accord pour que la main connaisse la forme, puis égrène-le.'],renv:['📸','Renversements','Pour enchaîner sans sauter, choisis le renversement le plus proche.'],
  nom:['🏷️','Lire un nom d\'accord','C = majeur, Cm = mineur, C7 = 7e de dominante, Cmaj7 = 7e majeure, C/E = Mi à la basse.']};
-const MEMOPAGE={start:['do','pouce','posture','cleSol','cleFa','quotidien'],play:['posture','lent','mains','pedale','metro','trois','pouceP'],sim:['nom','accord','renv','degres'],arps:['arpege','pouceP','metro','lent'],
+const MEMOPAGE={harm:['accord','degres','v_i','relative','renv'],voice:['transpo','magiques','ecoute','lent','mains'],start:['do','pouce','posture','cleSol','cleFa','quotidien'],play:['posture','lent','mains','pedale','metro','trois','pouceP'],sim:['nom','accord','renv','degres'],arps:['arpege','pouceP','metro','lent'],
  fing:['quinte','commun','grave','pouce'],ext:['ext','quinte','grave','transpo'],keys:['diese','relative','quintes','gamme','degres'],modes:['modes','gamme','relative'],voicing:['commun','grave','quinte','renv','accord'],
  recipes:['magiques','transpo','mains','morceaux','trois'],songs:['transpo','ecoute','morceaux','magiques'],artist:['ecoute','enreg','morceaux'],impro:['trois_notes','v_i','ecoute','degres'],genre:['ecoute','quotidien','transpo'],
  styles:['ecoute','enreg','trois_notes'],tiers:['magiques','transpo','degres'],train:['quotidien','degres','diese','relative'],mic:['enreg','lent','accord'],deg:['degres','magiques','v_i','relative','transpo']};
@@ -3194,8 +3203,8 @@ S.ped.rep=S.ped.rep||[];
 function repHTMLg(g){const pat=PROGT[g].pat;return`<div class="replist">${GREP[g].map((p,i)=>{const id=g+':'+i,done=(S.ped.rep||[]).includes(id);return`<div class="card repc ${done?'done':''}">
   <div class="rhead"><span class="rlvl l${p.l}">${'●'.repeat(p.l)}${'○'.repeat(3-p.l)} ${LVLN[p.l]}</span>${p.k?`<span class="small">en ${kLab(p.k)}</span>`:''}<button class="rbtn ${done?'on':''}" data-repdone="${id}">${done?'✓ maîtrisé':'○ à travailler'}</button></div>
   <h3>${p.t}</h3><p class="small" style="margin:0">${p.a}</p><p style="margin:6px 0"><b>Ce que tu y travailles :</b> ${p.w}</p>
-  ${p.g?`<div class="chips sm">${p.g.map(x=>`<span class="chip" style="cursor:default">${x.split(' ').map(symLabel).join(' ')}</span>`).join('')}</div><div class="row" style="margin-top:4px"><button class="btn alt" data-repplay="${id}">▶ Écouter la grille</button><button class="chip" data-repadd="${id}">➕ Ajouter à Morceaux</button></div>`
-   :`<p class="small">Note sa grille dans Morceaux (à partir d'un recueil ou d'un site d'accords) pour la jouer avec l'app.</p>`}</div>`;}).join('')}</div>`;}
+  ${p.full?`<div class="row" style="margin-top:4px"><button class="btn" data-fullopen="${p.full}">🎼 Ouvrir le morceau complet</button></div>`:p.g?`<div class="chips sm">${p.g.map(x=>`<span class="chip" style="cursor:default">${x.split(' ').map(symLabel).join(' ')}</span>`).join('')}</div><div class="row" style="margin-top:4px"><button class="btn alt" data-repplay="${id}">▶ Écouter la grille</button><button class="chip" data-repadd="${id}">➕ Ajouter à Morceaux</button></div>`
+   :p.imp?`<div class="tip b" style="margin-top:6px"><b>📄 Pour avoir toutes les notes</b>${IMPT[p.imp]}</div><button class="chip" data-impgo="1">📄 Importer le fichier (MIDI, MusicXML ou PDF)</button>`:`<p class="small">Note sa grille dans Morceaux (à partir d'un recueil ou d'un site d'accords) pour la jouer avec l'app.</p>`}</div>`;}).join('')}</div>`;}
 const LICKX={
  'Hook pentatonique':['Une petite phrase de 5 notes qui revient en boucle : le « crochet » qui accroche l\'oreille.','La pentatonique n\'a pas de demi-tons : impossible de sonner faux, tout est chantant.','Les refrains pop et les intros de piano.','Joue-le au début de chaque refrain, puis change seulement la dernière note.','Décale-le d\'un demi-temps (syncope) pour un effet plus moderne.'],
  'L\'appoggiature':['Une note « étrangère » posée sur le temps fort, qui glisse vers la note de l\'accord.','Le petit frottement suivi de sa résolution crée une émotion immédiate, comme un soupir.','Les ballades, de Mozart à la pop.','Sur un accord tenu, joue la note au-dessus de la tierce, puis descends sur la tierce.','Fais-la par en dessous : un demi-ton sous la note de l\'accord.'],
@@ -3218,6 +3227,8 @@ function lickExtra(L){const X=LICKX[L.n],o=gOffG(),tp=gpc(),R={0:'1',1:'♭2',2:
   return`<div class="lickx">${X?`<p><b>C'est quoi ?</b> ${X[0]}</p><p><b>Pourquoi ça sonne :</b> ${X[1]}</p><p><b>🎵 Où on l'entend :</b> ${X[2]}</p><p><b>Comment l'utiliser :</b> ${X[3]}</p><p><b>Variante :</b> ${X[4]}</p>`:''}
    <p class="small"><b>Les notes</b> (degré au-dessus) : ${notes}</p><p class="small">Méthode : écoute 2 fois → chante-le → joue-le lentement → place-le sur la grille → change une note ou le rythme.</p></div>`;}
 const PAGEPLAN={
+ harm:['Comprendre l\'harmonie, des intervalles à l\'analyse d\'un morceau.','1 chapitre par jour',['deg'],['Je construis un accord majeur, mineur et de 7e.','Je reconnais une cadence parfaite et plagale.','Je trouve la dominante secondaire d\'un accord.','J\'analyse une grille en degrés.']],
+ voice:['Accompagner un chanteur avec confiance.','À ton rythme',['recipes'],['Je trouve la tonalité d\'une chanson.','Je transpose une grille pour une voix.','Je varie l\'énergie entre couplet et refrain.','Je continue de jouer quand je me perds.']],
  start:['Découvrir le clavier, les notes, le rythme et jouer un premier morceau.','10 min par étape',[],['Je trouve tous les Do du clavier.','Je connais les numéros des doigts.','Je joue une gamme de Do.','Je joue un accord de Do majeur et de Do mineur.']],
  play:['Prendre les bons gestes et jouer les premiers accompagnements.','15 min par jour',['start'],['Je joue la position de Do aux deux mains.','Je fais le passage du pouce.','Je joue I – IV – V – I.','Je joue un accompagnement en arpège 1-5-8.']],
  sim:['Voir comment un accord se nomme et s\'écrit, en le construisant.','5 min',['start'],['Je construis un accord de 3 notes et je lis son nom.','Je reconnais un renversement à sa basse.','Je lis un accord sur la portée.']],
@@ -3256,6 +3267,118 @@ const SEPT={id:'sept',title:'September',artist:'Earth, Wind & Fire · arrangemen
   {name:'Pont',repeat:1,bars:['Bm9 E13','C#m7 F#m7','Bm9 E13','C#m7 F#m7','Bm9 E13','C#m7 F#m7','Gmaj9/A','Gmaj9/A'],rhy:['chorus','chorus','chorus','chorus','chorus','chorus','postHits1','postHits2']}],
  form:['Riff d\'ouverture','Intro','Couplet','Couplet','Refrain','Post-refrain','Couplet','Couplet','Refrain','Refrain','Pont','Refrain','Refrain'],sources:[]};
 
+
+
+/* ============ NATIONAL PARK (thème A relevé note à note dans la partition fournie) ============ */
+function npNotes(){const N=[],add=(bar,t,d,ms,h,v)=>ms.forEach(m=>N.push(v?[m,bar*4+t,d,h,v]:[m,bar*4+t,d,h]));
+  const R=(bar,t,d,ms,v)=>add(bar,t,d,ms,'rh',v),L=(bar,t,d,ms,v)=>add(bar,t,d,ms,'lh',v);
+  const I=0,M=n=>3+n; // 4 mesures d'intro, puis mesure n de la partition
+  /* ---- Intro libre (cadenza), rendue en mesures lentes ---- */
+  [[41,53,[72,77,80],[68,72,77]],[40,52,[71,76,80],[68,71,76]],[39,51,[70,73,78],[66,70,78]]].forEach(([b1,b2,ch,tri],k)=>{L(I,k,1,[b1,b2]);R(I,k,.34,ch);tri.forEach((m,j)=>R(I,k+(j+1)*.22,.3,[m]));});
+  const up=[39,42,45,49,51,54,57,61,63,66,69,73,75,78,81,85,87];up.forEach((m,j)=>(m<60?L:R)(I+1,j*(2.4/up.length),.3,[m]));R(I+1,2.4,1.6,[75,87]);
+  [97,96,93,92,90,89,87,85,84,81,80,78,77,75,73,72].forEach((m,j)=>R(I+2,j*.125,.2,[m]));
+  [[63,66,69],[66,69,73],[69,73,75],[73,75,78]].forEach((c,j)=>{R(I+2,2+j*.5,.5,c);L(I+2,2+j*.5,.5,[j%2?44:32]);});
+  [44,51,54,56,57,59,63,66,68,69,71,75,78,80].forEach((m,j)=>(m<60?L:R)(I+3,j*(1.5/14),.25,[m]));
+  L(I+3,1.5,1,[44,51,56]);R(I+3,1.5,1,[68,73,78]);L(I+3,2.5,1.5,[44,56,60]);R(I+3,2.5,1.5,[66,72,75]);
+  /* ---- A : mesures 1 à 13 ---- */
+  const inner=(b,pairs,times)=>times.forEach((t,i)=>R(b,t,.5,pairs[i%pairs.length]));
+  const dbBar=(b,last)=>{R(b,0,4,[73,77,80,84]);inner(b,[[63,68],[65,72]],[.5,1,1.5,2,2.5,3]);R(b,3.5,.5,last||[63,68]);};
+  const gbmBar=b=>{R(b,0,3.5,[73,78,80,81,85]);inner(b,[[61,69],[65,73]],[.5,1,1.5,2,2.5,3]);R(b,3.5,.25,[68,80]);R(b,3.75,.25,[70,82]);};
+  const broken=(b,root,fifth,ch,oct)=>{L(b,0,.5,[root]);L(b,.5,.5,[fifth]);L(b,1,.5,ch);L(b,1.5,.5,[oct]);L(b,2,.5,ch);L(b,2.5,.5,[oct]);L(b,3,.5,ch);L(b,3.5,.5,[oct]);};
+  const melGb=(b,minor)=>{R(b,0,.5,[77,89]);R(b,.5,.5,[75,87]);R(b,1,.5,[73,85]);if(minor)R(b,1.5,2.5,[69,81]);else{R(b,1.5,.5,[70,82]);R(b,2,2,[70,80]);}};
+  const theme=(o)=>{ // o = index de la mesure 2 de la partition
+    dbBar(o);L(o,0,.5,[37]);L(o,.5,.5,[44]);L(o,1,.5,[51]);L(o,1.5,1,[49,53]);L(o,2.5,1,[44,56]);L(o,3.5,.5,[51]);
+    gbmBar(o+1);L(o+1,0,.5,[49]);L(o+1,.5,.5,[45]);L(o+1,1,.5,[51]);L(o+1,1.5,1,[49,54]);L(o+1,2.5,1,[57]);L(o+1,3.5,.5,[44]);
+    dbBar(o+2,[64,68]);L(o+2,0,.5,[37]);L(o+2,.5,.5,[44]);L(o+2,1,.5,[51]);L(o+2,1.5,1,[49]);L(o+2,2.5,1,[51,56]);L(o+2,3.5,.5,[45]);
+    R(o+3,0,2,[73,78,80,81,85]);inner(o+3,[[61,69],[65,73]],[.5,1,1.5]);R(o+3,2,.5,[61,73,80,85]);R(o+3,2.5,.5,[72,84]);R(o+3,3,.5,[73,85]);R(o+3,3.5,.5,[75,87]);
+    L(o+3,0,.5,[37]);L(o+3,.5,.5,[45]);L(o+3,1,.5,[51]);L(o+3,1.5,1,[49]);L(o+3,2.5,1,[44,56]);L(o+3,3.5,.5,[43,55]);
+    const phrase=(b0,endBb)=>{melGb(b0,false);broken(b0,42,49,[58,61,65],54);melGb(b0+1,true);broken(b0+1,42,49,[57,61,65],54);
+      R(b0+2,0,.5,[75,87]);R(b0+2,.5,.5,[73,85]);R(b0+2,1,.5,[72,84]);R(b0+2,1.5,1,[68,80]);
+      if(!endBb){R(b0+2,2.5,1,[80,92]);R(b0+2,3.5,.5,[75,87]);}else{R(b0+2,2.5,1,[70,82]);R(b0+2,3.5,.5,[72,84]);}broken(b0+2,41,48,[56,60,63],53);
+      if(!endBb){R(b0+3,0,3.5,[77,89]);R(b0+3,3.5,.25,[73,85]);R(b0+3,3.75,.25,[75,87]);}else{R(b0+3,0,3.5,[70,82]);R(b0+3,3.5,.25,[68,80]);R(b0+3,3.75,.25,[70,82]);}
+      broken(b0+3,46,53,[58,62,65],53);};
+    phrase(o+4,false);phrase(o+8,true);};
+  R(M(1),3.5,.25,[68,80]);R(M(1),3.75,.25,[70,82]);theme(M(2));
+  /* ---- B : mesures 14 à 17 (voix intérieures en triolets) ---- */
+  const dbLH=b=>{L(b,0,1.5,[37]);L(b,1.5,.5,[44]);L(b,2,.5,[53,56]);L(b,2.5,1.5,[44]);};
+  R(M(14),0,4,[72,84]);R(M(14),1,.67,[63,68]);R(M(14),1.67,.33,[62,67]);R(M(14),2,.33,[61,66]);R(M(14),2.33,.33,[60,63]);R(M(14),2.67,.83,[65]);R(M(14),3.5,.5,[61]);dbLH(M(14));
+  R(M(15),0,3,[73,85]);[[66,73],[61,69],[69,75],[66,73],[73,78],[69,75],[73,81],[72,80]].forEach((c,j)=>R(M(15),1+j*.25,.25,c));R(M(15),3,.5,[80,90]);R(M(15),3.5,.25,[68,80]);R(M(15),3.75,.25,[70,82]);
+  L(M(15),0,1.5,[37]);L(M(15),1.5,.5,[45]);L(M(15),2,1,[54,57]);L(M(15),3,1,[32]);
+  R(M(16),0,4,[72,84]);R(M(16),1.25,.5,[63,68]);R(M(16),1.75,.75,[62,67]);R(M(16),2.5,.5,[61,66]);R(M(16),3,1,[60,63]);dbLH(M(16));
+  R(M(17),0,1,[73,85]);[87,85,81,78,75,73].forEach((m,j)=>R(M(17),1+j/6,.17,[m]));R(M(17),2,.5,[69,73,85]);R(M(17),2.17,.17,[66]);R(M(17),2.33,.17,[63]);R(M(17),2.5,.5,[72,84]);R(M(17),3,.5,[73,85]);R(M(17),3.5,.5,[75,87]);
+  L(M(17),0,1.5,[37]);L(M(17),1.5,.5,[45]);L(M(17),2,1,[54,57]);L(M(17),3,1,[56,60,64,68],1.2);
+  /* ---- A' : mesures 18 à 24 ---- */
+  const six=(b,ns)=>ns.forEach((m,j)=>L(b,j*.25,.25,[m]));
+  melGb(M(18),false);R(M(18),2.5,.5,[75]);R(M(18),3,.5,[73]);R(M(18),3.5,.5,[72]);six(M(18),[42,49,53,49,58,49,51,49,58,49,48,49,56,49,48,49]);
+  R(M(19),0,.5,[77,89]);R(M(19),.5,.5,[75,87]);R(M(19),1,.5,[73,85]);R(M(19),1.5,2,[69,81]);R(M(19),3.5,.25,[70,82]);R(M(19),3.75,.25,[71,83]);six(M(19),[42,49,53,56,57,61,65,69,69,73,69,65,61,57,53,49]);
+  R(M(20),0,.5,[75,85,87]);R(M(20),.5,.5,[73,80,85]);R(M(20),1,.5,[72,77,84]);R(M(20),1.5,1,[68,77,80]);R(M(20),2.5,1,[80,87,92]);R(M(20),3.5,.5,[75,84,87]);broken(M(20),41,48,[56,60,63],53);
+  R(M(21),0,3.5,[77,82,86]);[[1,74],[1.5,70],[2,74],[2.5,70],[3,77]].forEach(([t,m])=>R(M(21),t,.5,[m]));R(M(21),3.5,.25,[73,85]);R(M(21),3.75,.25,[75,87]);
+  L(M(21),0,2,[46]);L(M(21),0,.33,[62]);L(M(21),.33,.33,[58]);L(M(21),.67,.33,[53]);L(M(21),1,.5,[53,58,62]);L(M(21),1.5,.5,[50]);L(M(21),2,.5,[53,58,62]);L(M(21),2.5,.5,[50]);L(M(21),3,.5,[53,58,62]);L(M(21),3.5,.5,[50]);
+  melGb(M(22),false);L(M(22),0,.5,[42]);L(M(22),.5,.5,[49]);L(M(22),1,.5,[58]);L(M(22),1.5,1,[54,61,65]);L(M(22),2.5,.5,[61,65,70]);L(M(22),3,.5,[61,65]);L(M(22),3.5,.5,[65]);
+  melGb(M(23),true);R(M(23),3,1,[69]);L(M(23),0,.5,[42]);L(M(23),.5,.5,[49]);L(M(23),1,.5,[54]);L(M(23),1.5,1,[57,61,65]);L(M(23),2.5,.5,[61]);L(M(23),3,.5,[57,61]);L(M(23),3.5,.5,[61]);
+  R(M(24),0,.5,[75,87]);R(M(24),.5,.5,[73,85]);R(M(24),1,.5,[72,84]);R(M(24),1.5,1,[68,80]);R(M(24),2.5,1,[70,82]);R(M(24),3.5,.5,[72,84]);
+  [41,44,48,51,53,56,60,63].forEach((m,j)=>L(M(24),j*.25,.25,[m]));L(M(24),2,.25,[65]);L(M(24),2.25,.75,[68],1.25);
+  /* ---- C « driving » : mesures 25 à 34 (riff syncopé, sans pédale) ---- */
+  const V={Bb7:[[34,46],[53,56,62],[74,77,80],84],Ebm7:[[39,51],[54,58,61,63],[70,73,78],82],Gbm:[[42,54],[57,61,65],[69,73,78],77],Fm7:[[41,53],[56,60,63],[68,72,75],80]};
+  const riff=(b,k,top)=>{const[bs,lc,rc,tp]=V[k],T=top??tp;
+    L(b,0,.75,[...bs,...lc]);L(b,.75,.25,[bs[1]],.9);L(b,1.5,1,lc,1.25);L(b,2.5,.25,lc,.8);L(b,2.75,.5,lc);L(b,3.25,.25,lc,.8);
+    R(b,0,.75,[...rc,T]);R(b,.75,.25,rc,1.25);R(b,1.5,1,[...rc,T],1.25);R(b,3.75,.25,rc);};
+  ['Bb7','Ebm7','Gbm','Fm7','Bb7','Ebm7','Gbm','Fm7'].forEach((k,j)=>riff(M(25+j),k));
+  riff(M(33),'Bb7',75);R(M(33),2,1,[70,82],1.25);R(M(33),3,1,[74,86],1.25);
+  const[b34,l34]=V.Bb7;L(M(34),0,.75,[...b34,...l34]);L(M(34),1.5,1,l34,1.15);L(M(34),2.75,.5,l34);[[70,82],[65,77],[70,82],[65,77]].forEach((c,j)=>R(M(34),j,1,c,1.15-j*.08));
+  /* ---- mesure 35 : transition pp, puis D.S. ---- */
+  inner(M(35),[[63,68],[65,72]],[0,.5,1,1.5,2,2.5,3]);R(M(35),3.5,.25,[68,80]);R(M(35),3.75,.25,[70,82]);
+  /* ---- D.S. : retour au thème (mesures 2 à 13), puis fin proposée ---- */
+  theme(M(36));R(M(48),0,4,[73,77,80,84,87]);L(M(48),0,4,[37,44,53]);
+  return N.sort((a,b)=>a[1]-b[1]||a[0]-b[0]);}
+const NPARK={id:'npark',title:'National Park',artist:'Go Ichinose · arrangement Olimar12345',version:'Morceau complet relevé dans ta partition',key:'Db',bpm:86,beatsPerBar:4,
+ note:'Tout le morceau, de l\'intro libre au retour du thème (D.S.). Le thème A (mesures 1 à 13), la partie B (14-17) et la reprise variée (18-24) sont relevés note à note. L\'intro libre est mise en mesure, et la partie « driving » (25-34) reprend fidèlement les accords et le rythme syncopé, avec des voicings simplifiés. La partition boucle : j\'ai ajouté un accord final pour conclure.',
+ sections:[{name:'Intro libre',start:0,repeat:1,bars:['Db/F','Ebm7b5','Ab7sus4','Ab7']},
+  {name:'A · Thème',start:4,repeat:1,bars:['Ab','Dbmaj7','Gbmadd9/Db','Dbmaj7','Gbm/Db','Gbmaj7','Gbm(maj7)','Fm7','Bb','Gbmaj7','Gbm(maj7)','Fm7','Bb']},
+  {name:'B · Triolets',start:17,repeat:1,bars:['Dbmaj7','Gbm/Db Ab7','Dbmaj7','Gbm/Db Abaug']},
+  {name:'A\' · Reprise variée',start:21,repeat:1,bars:['Gbmaj7','Gbm(maj7)','Fm7','Bb','Gbmaj7','Gbm(maj7)','Fm7']},
+  {name:'C · Driving',start:28,repeat:1,bars:['Bb7','Ebm7','Gbm(maj7)','Fm7','Bb7','Ebm7','Gbm(maj7)','Fm7','Bb7','Bb7']},
+  {name:'Transition',start:38,repeat:1,bars:['Ab']},
+  {name:'D.S. · Retour au thème',start:39,repeat:1,bars:['Dbmaj7','Gbmadd9/Db','Dbmaj7','Gbm/Db','Gbmaj7','Gbm(maj7)','Fm7','Bb','Gbmaj7','Gbm(maj7)','Fm7','Bb']},
+  {name:'Fin',start:51,repeat:1,bars:['Dbmaj9']}],
+ form:['Intro libre','A · Thème','B · Triolets','A\' · Reprise variée','C · Driving','Transition','D.S. · Retour au thème','Fin'],sources:[],guide:'npark',kfix:{t:1,min:false,s:0}};
+const NPGUIDE={
+ overview:[['🎼','Tonalité','Ré♭ majeur, 5 bémols (Si♭, Mi♭, La♭, Ré♭, Sol♭). Mesure à 4 temps, « Tenderly » (tendrement), noire = 86.'],
+  ['🧱','Trois couches','En haut, la mélodie (souvent en octaves). Au milieu, des petites tierces et quartes en croches. En bas, une basse brisée qui monte en arpège.'],
+  ['🗺️','Le plan','Intro libre → A (thème) → B (triolets) → A\' (reprise variée) → C (« driving », syncopé) → transition → D.S. (retour au thème).'],
+  ['🌗','La couleur magique','L\'accord de Sol♭ mineur (Gbm) dans une tonalité majeure : c\'est un emprunt (le iv mineur). Il donne ce sentiment de nostalgie.'],
+  ['♭♭','Le double bémol','Si♭♭ = Si baissé deux fois = La (touche blanche). C\'est la tierce de Gbm. Pense « La » sous les doigts, mais lis « Si♭♭ ».'],
+  ['♮','Le Ré naturel','À la mesure 9, Ré♮ transforme Si♭ mineur en Si♭ majeur : une dominante secondaire (V/ii) qui relance le thème.']],
+ phrases:[
+  {s:0,m0:0,t:'Intro libre (cadenza)',d:'« Freely » : sans tempo strict. Trois accords égrenés en triolets sur une basse qui descend Fa – Fa♭ – Mi♭, puis une grande montée en quintolets partagée entre les deux mains, une descente rapide dans l\'aigu, et des accords qui s\'élargissent sur la basse La♭ (la dominante) jusqu\'au point d\'orgue pp.',
+   tips:['Joue-la d\'abord en mesure, lentement, comme ici. Le rubato viendra quand les notes seront sûres.','La montée en quintolets : main gauche pour le grave, main droite dès qu\'on passe le Do central. Pense « vague », pas « gamme ».','Le dernier accord pp : laisse-le sonner avec la pédale avant d\'attaquer « Tenderly ».']},
+  {s:1,m0:1,t:'A · Le thème (mesures 1 à 13)',d:'L\'anacrouse La♭ – Si♭ en octaves, puis Dbmaj7 et Gbm/Ré♭ en alternance (mesures 2 à 5), avec les petites tierces en croches au milieu. Ensuite la mélodie descend en octaves sur Gbmaj7, Gbm(maj7), Fm7 et Si♭ (mesures 6 à 9), deux fois, avec une fin différente la seconde fois.',
+   tips:['Accords roulés : du grave vers l\'aigu, très vite, la note du haut sur le temps.','Les croches du milieu avec les doigts 1-2 : une horloge douce, sans lever la main.','Mesure 12 : la fin change (Si♭ – Do au lieu du saut vers La♭). Repère-la avant de jouer.']},
+  {s:2,m0:14,t:'B · Les triolets (mesures 14 à 17)',d:'La mélodie tient de longues octaves (Do, Ré♭) pendant que la voix du milieu descend chromatiquement en triolets : Mi♭/La♭ → Ré/Sol → Ré♭/Sol♭ → Do/Mi♭. Mesure 15, une ronde de doubles croches, puis un accord de La♭ ; mesure 17, une cascade en sextolets et l\'accord de La♭ augmenté accentué à la main gauche.',
+   tips:['Les triolets : compte « 1-2-3 » par temps, à voix haute, avant de jouer.','Les doubles bémols (Mi♭♭ = Ré, La♭♭ = Sol) : ce sont des touches blanches.','Mesure 17 : la cascade en sextolets est un ornement. Commence par la jouer en croches, puis accélère.']},
+  {s:3,m0:18,t:'A\' · La reprise variée (mesures 18 à 24)',d:'Le thème revient, mf, mais la main gauche joue maintenant en doubles croches continues (mesures 18-19), puis des accords plus pleins. Mesure 21, l\'accord de Si♭ majeur avec Ré♮ ; mesures 22-24, la phrase revient p et se termine par une montée de la main gauche vers un La♭ accentué.',
+   tips:['Main gauche en doubles croches : garde le 5 sur la basse et laisse la main tourner autour du pouce.','Mesure 19 : la main droite prend quelques notes de la main gauche (« r.h. ») dans l\'aigu.','Mesure 24 : lève la pédale sur le La♭ accentué (le signe ✻).']},
+  {s:4,m0:25,t:'C · Driving (mesures 25 à 34)',d:'Changement total : f, sans pédale, un riff syncopé. Croche pointée, double croche accentuée, silence, accord accentué sur le « 2 et »… Les accords : Si♭7 – Mi♭m7 – Gbm – Fm7, deux fois, puis Si♭7 pour finir en ralentissant (« ease off »).',
+   tips:['Sans pédale : tout doit être sec et précis. Les accents (>) font le groove.','Travaille le rythme seul en tapant sur la table : « long-court… silence… BAM ».','Garde le poignet souple pour les accords répétés : le rebond vient du poignet, pas du bras.']},
+  {s:5,m0:35,t:'Transition (mesure 35) et D.S.',d:'pp, avec pédale : les petites tierces du thème reviennent seules, puis l\'anacrouse La♭ – Si♭. « D.S. » (dal segno) : on retourne au signe 𝄋 de la mesure 2 et on rejoue le thème.',
+   tips:['Contraste maximal : après le riff fort, joue presque rien, très doux.','Dans l\'app, le retour au thème est écrit en entier : tu n\'as pas besoin de revenir en arrière.','La partition boucle (musique de jeu vidéo) : l\'accord final de Dbmaj9 est une fin proposée.']}],
+ tricks:[['🌊','La pédale','« con pedale » : change la pédale à chaque nouvel accord (au début de chaque mesure). Lève et rabaisse juste après avoir joué l\'accord.'],
+  ['🎚️','Les nuances','mp au début, crescendo sur chaque mesure (les « soufflets »), mf à la phrase 2. La mélodie toujours plus forte que l\'accompagnement.'],
+  ['🌀','Les accords roulés','Le signe ondulé = égrener l\'accord du grave vers l\'aigu, très vite. La note du haut (la mélodie) arrive sur le temps.'],
+  ['🐢','Le tempo','« Tenderly » : commence à 50, puis 70, puis 86. Un peu de rubato est permis, surtout avant les anacrouses.'],
+  ['🧩','L\'ordre de travail','1) Main gauche seule. 2) Mélodie seule (notes du haut). 3) Main droite complète. 4) Ensemble, phrase par phrase.'],
+  ['🎹','Improviser dessus','La pentatonique de Ré♭ (Ré♭ – Mi♭ – Fa – La♭ – Si♭) marche sur toute la phrase 1. Sur Gbm, remplace Si♭ par Si♭♭ (La).']]};
+function guideHTML(song){const G=NPGUIDE;return`<h2>🎼 Le guide de la partition</h2>
+  <p class="small">${song.note}</p>
+  <div class="memogrid">${G.overview.map(([i,t,d])=>`<div class="memoc"><span>${i}</span><b>${t}</b><p>${d}</p></div>`).join('')}</div>
+  ${handsSeg()}
+  <div class="row"><span class="small">Tempo de travail :</span><div class="seg">${[.5,.7,.85,1].map(f=>`<button data-mstempo="${f}" class="${S.sBpm===Math.round((song.bpm||80)*f)?'on':''}">${Math.round(f*100)} %</button>`).join('')}</div><span class="small">${S.sBpm} bpm</span></div>
+  ${G.phrases.map(P=>`<div class="card"><div class="row" style="margin:0;justify-content:space-between"><h3>${P.t}</h3><button class="btn alt" data-mssec="${P.s}">▶ Écouter</button></div>
+   <p>${P.d}</p><div class="msbars">${song.sections[P.s].bars.map((b,i)=>`<span><i class="msc"><b>${symLabel(b).replace(/#/g,'♯')}</b><small>${P.m0?'mes. '+(P.m0+i):'intro '+(i+1)}</small></i></span>`).join('')}</div>
+   <ul class="clean" style="margin-top:8px">${P.tips.map(t=>`<li>${t}</li>`).join('')}</ul>
+   <div class="row"><button class="chip" data-sview="follow">🎙️ La jouer avec le suivi au micro</button></div></div>`).join('')}
+  <h3>Les astuces de la partition</h3>
+  <div class="memogrid">${G.tricks.map(([i,t,d])=>`<div class="memoc"><span>${i}</span><b>${t}</b><p>${d}</p></div>`).join('')}</div>`;}
 
 /* ============ RYTHMES DE PARTITION & MAINS SÉPARÉES ============ */
 const RPAT={
@@ -3359,10 +3482,10 @@ function masterPlan(song,U){const secs=[...new Set(formOrder(song).map(i=>song.s
    ['Semaine 2 · Les accords sous les doigts',[`Main gauche seule sur tout le morceau, puis main droite seule`,`Tous les accords du morceau, mains ensemble, au tempo lent`,`La section « ${secs[0]} » en boucle à 50 % du tempo`,`Tester chaque accord au micro ou dans le simulateur`]],
    ['Semaine 3 · Le rythme et les sections',[`Chaque section (${secs.join(', ')}) à 70 % du tempo`,`Ajouter un arpège ou le rythme de l\'arrangement`,`Enchaîner deux sections sans s\'arrêter`]],
    ['Semaine 4 · Le morceau entier',[`Tout le morceau à 85 %, puis au tempo`,`Improviser 1 minute sur une boucle avec la pentatonique`,`S\'enregistrer et réécouter`,`Le jouer pour quelqu\'un (ou en version « accompagner le chant »)`]]];}
-function masterHTML(song){const U=songUniq(song),K=detectKey(song),ov=((S.ped.songM||{})[song.id]||{}).key,k=ov||K[0];if(!k)return`<div class="card"><p>Pas d'accords à analyser.</p></div>`;
+function masterHTML(song){const U=songUniq(song),K=detectKey(song),ov=((S.ped.songM||{})[song.id]||{}).key,k=ov||song.kfix||K[0];if(song.kfix&&!K.some(x=>x.t===song.kfix.t&&x.min===song.kfix.min).valueOf())K.unshift(song.kfix);if(!k)return`<div class="card"><p>Pas d'accords à analyser.</p></div>`;
   const M=(S.ped.songM=S.ped.songM||{})[song.id]||(S.ped.songM[song.id]={known:[],tasks:[]});
   const L=k.min?MIN_KEYS:MAJ_KEYS,ke=L.find(x=>parse(x.t).pc===k.t),sc=spell(ke.t,k.min?MIN:MAJ),known=U.filter(u=>M.known.includes(u.c)).length;
-  const conf=K[1]?Math.min(99,Math.round(50+(k.s-K[1].s)*6)):90,alt=K.slice(1,3).map(keyLabel).join(' ou ');
+  const conf=song.kfix?100:K[1]?Math.min(99,Math.round(50+(k.s-K[1].s)*6)):90,alt=K.slice(1,3).map(keyLabel).join(' ou ');
   const scM=stack(sc.map(n=>n.pc),60);scM.push(scM[0]+12);const smk={};scM.forEach((m,i)=>smk[m]={c:'rh',f:ke.rh[i]});
   const used=new Set(U.map(u=>parseChord(u.c)).filter(Boolean).map(c=>c.root));
   const dia=[0,1,2,3,4,5,6].map(d=>chordAt(sc,d,true,k.min));
@@ -3371,8 +3494,9 @@ function masterHTML(song){const U=songUniq(song),K=detectKey(song),ov=((S.ped.so
   return `<div class="card mhero"><span class="small">Maîtriser à fond</span><h2 style="margin:2px 0">${song.title}</h2><p class="small">${song.artist||''}${song.bpm?` · ♩ = ${song.bpm}`:''}</p>
    <div class="row"><span><b>${known}/${U.length}</b> accords sus</span><span><b>${dn}/${nt}</b> étapes du programme</span></div><div class="progress"><i style="width:${Math.round((known/U.length*.5+dn/nt*.5)*100)}%"></i></div></div>
 
+  ${song.guide?guideHTML(song):''}
   <h2>1 · La tonalité</h2>
-  <div class="card"><p>D'après les accords, ce morceau est en <b class="micbig" style="font-size:28px">${keyLabel(k)}</b></p>
+  <div class="card"><p>${song.kfix?'D\'après l\'armure de la partition':'D\'après les accords'}, ce morceau est en <b class="micbig" style="font-size:28px">${keyLabel(k)}</b></p>
    <p class="small">Confiance : ${conf} %${alt?` · autres possibilités : ${alt}`:''}. ${song.key&&parseChord(song.key)&&parseChord(song.key).root!==k.t?`La grille indique « ${song.key} » : vérifie à l'oreille.`:''}</p>
    <div class="chips sm"><span class="small" style="align-self:center">Pas d'accord avec l'app ? Choisis :</span>${K.slice(0,4).map(x=>`<button class="chip ${x.t===k.t&&x.min===k.min?'on':''}" data-mskeyset="${x.t}:${x.min?1:0}">${keyLabel(x)}</button>`).join('')}</div>
    <p class="small">Comment l'app le sait : elle compte combien d'accords du morceau appartiennent à chaque tonalité, et regarde la basse du dernier accord (souvent la tonique).</p>
@@ -3420,23 +3544,41 @@ function masterHTML(song){const U=songUniq(song),K=detectKey(song),ov=((S.ped.so
 /* ============ IMPORT DE PARTITION ============ */
 S.imp2={url:null,type:'',name:'',msg:''};
 const QPR=['C','C#','Db','D','Eb','E','F','F#','Gb','G','Ab','A','Bb','B'],QPQ=['','m','7','maj7','m7','m7b5','dim','sus4','add9','6','9','maj9','m9','11','13','7b9'];
-function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib)return res(window.pdfjsLib);const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-  s.onload=()=>{try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}res(window.pdfjsLib);};s.onerror=()=>rej(new Error('pdf.js'));document.head.appendChild(s);});}
+const PDFJS=[{u:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',w:'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'},{esm:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs',w:'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.min.mjs'}];
+function loadPdfJs(){if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  const umd=c=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=c.u;s.onload=()=>{if(!window.pdfjsLib)return rej(new Error('pdf.js'));try{pdfjsLib.GlobalWorkerOptions.workerSrc=c.w;}catch(e){}res(window.pdfjsLib);};s.onerror=()=>{s.remove();rej(new Error('pdf.js'));};document.head.appendChild(s);});
+  const esm=async c=>{const m=await import(c.esm);try{m.GlobalWorkerOptions.workerSrc=c.w;}catch(e){}window.pdfjsLib=m;return m;};
+  return PDFJS.reduce((p,c)=>p.catch(()=>c.esm?esm(c):umd(c)),Promise.reject());}
 async function extractChords(buf){const lib=await loadPdfJs(),doc=await lib.getDocument({data:buf}).promise,lines=[];
   for(let p=1;p<=doc.numPages;p++){const tc=await(await doc.getPage(p)).getTextContent();const it=tc.items.filter(x=>x.str&&x.str.trim()).map(x=>({s:x.str.trim(),x:x.transform[4],y:x.transform[5],w:x.width||x.str.length*5}));
     it.sort((a,b)=>b.y-a.y||a.x-b.x);const rows=[];it.forEach(t=>{const r=rows.find(r=>Math.abs(r.y-t.y)<9);if(r)r.items.push(t);else rows.push({y:t.y,items:[t]});});
     rows.forEach(r=>{r.items.sort((a,b)=>a.x-b.x);const toks=[];r.items.forEach(t=>{const last=toks[toks.length-1];if(last&&t.x-(last.x+last.w)<4&&/^(maj|min|m|M|dim|aug|sus|add|°|ø|\+|\d|\(|\/|#|b|♯|♭|Δ)/.test(t.s)){last.s+=t.s;last.w=t.x+t.w-last.x;}else toks.push({...t});});
       const sec=toks.map(t=>t.s).join(' ').match(/\b(Intro|Verse|Couplet|Chorus|Refrain|Bridge|Pont|Outro|Post-Chorus|Pre-Chorus|Coda)\b/i);
-      const ch=toks.map(t=>t.s.replace(/♯/g,'#').replace(/♭/g,'b').replace(/Δ/g,'maj7').replace(/^([A-G][#b]?)M7/,'$1maj7')).filter(s=>/^[A-G][#b]?[^\s]{0,10}$/.test(s)&&parseChord(s));
-      if(sec)lines.push('\n'+sec[1]+':');if(ch.length)lines.push(ch.join(' ')+' |');});}
+      const ch=toks.map(t=>t.s.replace(/♯/g,'#').replace(/♭/g,'b').replace(/Δ/g,'maj7').replace(/^([A-G][#b]?)M7/,'$1maj7')).filter(s=>/^[A-G][#b]?(maj|min|m|M|dim|aug|sus|add|°|ø|\+|\d|\(|\)|#|b|\/[A-G][#b]?)*$/.test(s)&&parseChord(s));
+      const words=toks.filter(t=>!/^(Intro|Verse|Couplet|Chorus|Refrain|Bridge|Pont|Outro|Post-Chorus|Pre-Chorus|Coda):?$/i.test(t.s)).length;
+      if(sec)lines.push('\n'+sec[1]+':');if(ch.length&&ch.length>=words*.6)lines.push(ch.join(' | ')+' |');});}
   return lines.join(' ').replace(/\s+\|/g,' |').replace(/\|\s*\n/g,'\n').trim();}
-async function importFile(f){const I=S.imp2;if(I.url)URL.revokeObjectURL(I.url);I.url=URL.createObjectURL(f);I.type=f.type;I.name=f.name.replace(/\.[^.]+$/,'');I.msg='Lecture de la partition…';S.songForm=true;S.sf={...S.sf,t:S.sf.t||I.name};render();
-  if(/pdf/.test(f.type)){try{const txt=await extractChords(await f.arrayBuffer());if(txt&&txt.replace(/[^A-G]/g,'').length>2){S.sf.g=txt.replace(/^\n/,'');I.msg='✓ Accords trouvés dans le PDF : vérifie-les et corrige si besoin avant d\'enregistrer.';}
-      else I.msg='Cette partition est une image (scan ou export en image) : l\'app ne peut pas lire les accords toute seule. Recopie-les avec le clavier d\'accords ci-dessous, en regardant la partition.';}
+function quantNotes(notes){const q=x=>{const a=Math.round(x*4)/4,b=Math.round(x*3)/3;return Math.abs(x-a)<=.04?a:Math.abs(x-b)<=.04?b:Math.round(x*48)/48;};
+  return notes.map(n=>{const st=q(n[1]),en=q(n[1]+n[2]);return[n[0],st,Math.max(.125,en-st),n[3]];});}
+async function sniff(f){const h=new Uint8Array(await f.slice(0,512).arrayBuffer()),t=new TextDecoder().decode(h);
+  if(t.startsWith('MThd'))return'mid';if(h[0]===0x50&&h[1]===0x4B)return'mxl';if(t.startsWith('%PDF'))return'pdf';if(/<score-(partwise|timewise)|<!DOCTYPE score/.test(t)||(/^\s*<\?xml/.test(t)&&/score/i.test(t)))return'xml';
+  if(/^image\//.test(f.type))return'img';const ext=(f.name.split('.').pop()||'').toLowerCase();return{mid:'mid',midi:'mid',kar:'mid',musicxml:'xml',xml:'xml',mxl:'mxl',pdf:'pdf',png:'img',jpg:'img',jpeg:'img'}[ext]||'?';}
+async function importFile(f){const I=S.imp2,kind=await sniff(f),ext=kind==='mid'?'mid':kind==='xml'?'musicxml':kind==='mxl'?'mxl':kind;
+  if(kind==='?'){I.msg='Format non reconnu : choisis un fichier MIDI (.mid), MusicXML (.musicxml, .mxl), PDF ou une photo.';S.songForm=true;render();return;}
+  if(['mid','musicxml','mxl'].includes(ext)){I.msg='Lecture des notes…';render();try{const buf=await f.arrayBuffer();const res=ext==='mid'?parseMidi(buf):parseMusicXML(ext==='mxl'?await unzipFirstXml(buf):new TextDecoder().decode(buf));res.notes=quantNotes(res.notes);if(res.notes.length>20000)throw new Error('fichier trop long (plus de 20 000 notes)');
+      const song=notesToSong(res,(res.name&&String(res.name).trim())||f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' '));S.saved=[song,...S.saved].slice(0,50);persist();S.song=song;applyPrefs(song);S.sRhy='notes';S.songForm=false;S.songView='master';I.msg='';
+      pedToast(`✓ ${song.notes.length} notes importées`);}catch(e){I.msg='Lecture impossible : '+(e.message||'fichier non reconnu')+'.';}render();return;}if(I.url)URL.revokeObjectURL(I.url);I.url=URL.createObjectURL(f);I.type=f.type;I.name=f.name.replace(/\.[^.]+$/,'');I.msg='Lecture de la partition…';S.songForm=true;S.sf={...S.sf,t:S.sf.t||I.name};render();
+  if(kind==='pdf'){I.type='application/pdf';render();try{const txt=await extractChords(await f.arrayBuffer());if(txt&&txt.replace(/[^A-G]/g,'').length>2){S.sf.g=txt.replace(/^\n/,'');I.msg='✓ Accords trouvés dans le PDF : vérifie-les et corrige si besoin avant d\'enregistrer.';}
+      else I.msg='Ce PDF ne contient pas les notes sous forme lisible (c\'est le cas des exports MuseScore et des scans). Le plus fiable : télécharge le fichier MIDI ou MuseScore/MusicXML de la même partition (NinSheetMusic, MuseScore.com et beaucoup de sites les proposent) et importe-le ici : l\'app lira toutes les notes. Sinon, recopie les accords avec le clavier ci-dessous.';}
     catch(e){I.msg='Lecture automatique impossible ici. Recopie les accords avec le clavier d\'accords ci-dessous, en regardant la partition.';}}
-  else I.msg='Image affichée : recopie les accords avec le clavier d\'accords ci-dessous.';render();}
-function importHTML(){const I=S.imp2;return`<div class="impbox"><label class="btn alt impbtn">📄 Importer une partition (PDF ou photo)<input type="file" id="scorefile" accept="application/pdf,image/*" hidden></label>
-  ${I.msg?`<p class="small">${I.msg}</p>`:''}
+  else I.msg='Image affichée : recopie les accords avec le clavier d\'accords ci-dessous.';render();const bx=document.querySelector('.impbox');if(bx)bx.scrollIntoView({block:'start'});}
+function importBar(){const I=S.imp2;return`<div class="card impbar"><div><b>📥 Importer une partition</b><p class="small" style="margin:2px 0 0">MIDI (.mid), MusicXML (.musicxml, .mxl) : toutes les notes, les deux mains. PDF : les accords s'ils sont écrits en texte, sinon la partition s'affiche pour recopier les accords.</p></div>
+  <label class="btn impbtn">📄 Choisir un fichier<input type="file" id="scorefileTop" accept=".mid,.midi,.kar,.musicxml,.xml,.mxl,.pdf,application/pdf,audio/midi,audio/x-midi,image/*" hidden></label>
+  ${I.msg&&!S.songForm?`<p class="small" style="flex-basis:100%">${I.msg}</p>`:''}</div>`;}
+function pickScore(){const inp=document.createElement('input');inp.type='file';inp.accept='.mid,.midi,.kar,.musicxml,.xml,.mxl,.pdf,application/pdf,audio/midi,audio/x-midi,image/*';inp.style.display='none';document.body.appendChild(inp);
+  inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.remove();if(f){S.tab='songs';importFile(f);}};inp.click();}
+function importHTML(){const I=S.imp2;return`<div class="impbox"><label class="btn alt impbtn">📄 Importer une partition (MIDI, MusicXML, PDF ou photo)<input type="file" id="scorefile" accept=".mid,.midi,.kar,.musicxml,.xml,.mxl,.pdf,application/pdf,audio/midi,audio/x-midi,image/*" hidden></label>
+  ${I.msg?`<p class="small">${I.msg}</p>`:`<p class="small">Le plus fiable : un fichier <b>MIDI</b> (.mid) ou <b>MusicXML</b> (.musicxml, .mxl). L'app y lit toutes les notes et les deux mains. Un PDF ne fonctionne que s'il contient les accords écrits en texte.</p>`}
   ${I.url?`<div class="scoreview">${/pdf/.test(I.type)?`<iframe src="${I.url}" title="Partition"></iframe><a class="small" href="${I.url}" target="_blank" rel="noopener">Ouvrir la partition en grand ↗</a>`:`<img src="${I.url}" alt="Partition importée">`}</div>`:''}
   </div>`;}
 function qpadHTML(){return`<div class="qpad"><div class="small">Clavier d'accords : fondamentale, puis type</div><div class="chips sm">${QPR.map(r=>`<button class="chip" data-qp="r:${r}">${nm(parse(r))}</button>`).join('')}</div>
@@ -3453,7 +3595,7 @@ function folVoice(sym){if(vCache[sym])return vCache[sym];const c=fgChord(sym),E=
 function folEssential(sym){const c=parseChord(sym);if(!c)return{all:[],ess:[]};const all=[...new Set([...c.ints.map(i=>mod(c.root+i)),c.bass])];
   const th=c.ints.find(i=>[2,3,4,5].includes(i)),sv=c.ints.find(i=>[9,10,11].includes(i)),ess=[c.bass,c.root];if(th!==undefined)ess.push(mod(c.root+th));if(sv!==undefined)ess.push(mod(c.root+sv));
   return{all,ess:[...new Set(ess)]};}
-function folBuild(){const F=S.fol,song=S.song;F.songId=song.id+':'+F.gran;F.ev=[];let t=0;const bpb=song.beatsPerBar||4;
+function folBuild(){const F=S.fol,song=S.song;F.songId=song.id+':'+F.gran;if(song.notes){folBuildNotes();return;}F.ev=[];let t=0;const bpb=song.beatsPerBar||4;
   formOrder(song).forEach(si=>{const sec=song.sections[si];for(let r=0;r<(sec.repeat||1);r++)(sec.bars||[]).forEach((b,bi)=>{const chs=splitBar(b);let d=bpb/Math.max(1,chs.length);
     const P=Array.isArray(sec.rhy)&&RPAT[sec.rhy[bi]],starts=chs.map((_,ci)=>{if(!P)return ci*d;const xs=P.filter(e=>e[0]===ci).map(e=>e[1]);return xs.length?Math.min(...xs):ci*d;});const t0=t;
     chs.forEach((sym,ci)=>{t=t0+starts[ci];d=(ci<chs.length-1?starts[ci+1]:bpb)-starts[ci];const v=folVoice(sym);if(!v){t+=d;return;}const E=folEssential(sym);
@@ -3484,14 +3626,14 @@ function folJudge(now){const F=S.fol,M=S.mic,cur=F.ev[F.i];if(!cur||!M.on||!M.ac
   const mx=Math.max(...M.w)||1,det=[...Array(12).keys()].filter(i=>M.w[i]/mx>=F.th);F.hist.push(det);if(F.hist.length>12)F.hist.shift();
   const cnt=new Array(12).fill(0);F.hist.forEach(d=>d.forEach(p=>cnt[p]++));const present=[...Array(12).keys()].filter(p=>cnt[p]>=4);F.present=present;
   F.minRms=Math.min(F.minRms,M.level);const onset=M.level>F.minRms*1.35+.0004||now-F.acc>1600;if(onset)F.onset=true;
-  let ok;if(F.gran==='note'){const p=mod(cur.note),strong=M.w[p]/mx>=.7;ok=present.includes(p)&&strong;}
+  let ok;if(F.gran==='note'){const p=mod(cur.note),strong=M.w[p]/mx>=(cur.allow&&cur.allow.length?.5:.7);ok=present.includes(p)&&strong;}
   else{const P=new Set(present),lp=[...new Set(cur.lh.map(m=>mod(m)))],rp=[...new Set(cur.rh.map(m=>mod(m)))];let all=cur.all,ess=cur.ess;
     if(S.hands==='lh'){all=lp;ess=lp;}else if(S.hands==='rh'){all=rp;const ie=rp.filter(p=>cur.ess.includes(p));ess=ie.length>=2?ie:rp;}
-    const extra=present.filter(p=>!all.includes(p)&&!(S.hands!=='both'&&cur.all.includes(p)));ok=ess.every(p=>P.has(p))&&extra.length===0;F.miss=ess.filter(p=>!P.has(p));F.extra=extra;}
+    const extra=present.filter(p=>!all.includes(p)&&!(S.hands!=='both'&&cur.all.includes(p))&&!(cur.allow||[]).includes(p));ok=ess.every(p=>P.has(p))&&extra.length===0;F.miss=ess.filter(p=>!P.has(p));F.extra=extra;}
   F.okc=ok?F.okc+1:Math.max(0,F.okc-1);return F.okc>=(F.gran==='note'?5:7)&&F.onset;}
 function folAdvance(byUser){const F=S.fol;if(byUser==='skip')F.skip++;else{F.ok++;F.flash=performance.now()+350;}F.i++;F.onset=false;folReset();
   if(F.i>=F.ev.length){F.done=true;F.run=false;addXP(20,'morceau terminé');folText(true);}}
-function folText(force){const F=S.fol,cur=F.ev[F.i],el=document.getElementById('fname');if(!el)return;const fl=gFlat(),N=p=>nm(parse((fl?FLAT:SHARP)[mod(p)]));
+function folText(force){const F=S.fol,cur=F.ev[F.i],el=document.getElementById('fname');if(!el)return;const fl=S.song?prefFlat(S.song):gFlat(),N=p=>nm(parse((fl?FLAT:SHARP)[mod(p)]));
   let txt;if(F.done)txt=`<div class="micbig">🎉 Terminé !</div><div class="small">✓ ${F.ok} juste${F.ok>1?'s':''} · ⏭ ${F.skip} passé${F.skip>1?'s':''}</div>`;
   else if(cur){const nameS=symLabel(cur.sym).replace(/#/g,'♯');txt=F.gran==='note'?`<div class="small">${cur.sec} · ${nameS}</div><div class="micbig">${N(cur.note)}<small>${Math.floor(cur.note/12)-1}</small></div>`
     :`<div class="small">${cur.sec} · accord ${F.i+1}/${F.ev.length}${S.hands!=='both'?' · '+(S.hands==='lh'?'main gauche':'main droite'):''}</div><div class="micbig">${nameS}</div><div class="small">Joue : ${(S.hands==='lh'?[...new Set(cur.lh.map(m=>mod(m)))]:S.hands==='rh'?[...new Set(cur.rh.map(m=>mod(m)))]:cur.all).map(p=>cur.ess.includes(p)?`<b>${N(p)}</b>`:N(p)).join(' · ')} <span class="small">(en gras : indispensables)</span></div>`;}
@@ -3508,7 +3650,7 @@ function folLoop(){const F=S.fol;if(S.tab!=='songs'||S.songView!=='follow'){F.ra
     else{if(nt>=cur.t){F.t=cur.t;if(!F.waitStart)F.waitStart=now;}else F.t=nt;}}
   if(F.mode==='wait'&&cur&&!F.done&&F.t>=cur.t-.05){if(folJudge(now))folAdvance();}else if(S.mic.on)folJudge(now);
   folDraw();if(now-(F.lt||0)>120){F.lt=now;folText();}}
-function folStart(){const F=S.fol;const id=S.song.id+':'+F.gran;if(F.songId!==id)folBuild();if(!F.raf){F.last=performance.now();F.raf=requestAnimationFrame(folLoop);}}
+function folStart(){const F=S.fol;const id=S.song.id+':'+F.gran;if(F.songId!==id){folBuild();if(F.ev[0])F.t=F.ev[0].t-2;}if(!F.raf){F.last=performance.now();F.raf=requestAnimationFrame(folLoop);}}
 function followHTML(song){const F=S.fol,secs=[];let seen=new Set();F.ev.forEach((e,k)=>{if(!seen.has(e.sec)){seen.add(e.sec);secs.push([e.sec,k]);}});
   return`${handsSeg()}<div class="card fol"><div class="row" style="margin:0;justify-content:space-between;flex-wrap:wrap">
    <div class="seg"><button data-fmode="wait" class="${F.mode==='wait'?'on':''}">🎙️ J'attends la bonne note</button><button data-fmode="step" class="${F.mode==='step'?'on':''}">👆 Pas à pas</button><button data-fmode="listen" class="${F.mode==='listen'?'on':''}">🎧 Écouter</button></div>
@@ -3535,13 +3677,623 @@ function followHTML(song){const F=S.fol,secs=[];let seen=new Set();F.ev.forEach(
    <div class="tip b"><b>Piano doux</b>Coche « Amplifier le micro », appuie sur « Mesurer le silence » sans jouer, puis augmente la sensibilité si besoin. Pose le téléphone près du piano, pas sur le pupitre d'un piano numérique qui vibre.</div>
    <div class="tip"><b>Accords répétés</b>Quand le même accord revient, rejoue-le franchement : l'app attend une nouvelle attaque avant d'avancer.</div></div>`;}
 
+
+/* ============ IMPORT MIDI / MUSICXML (notes réelles de la partition) ============ */
+function parseMidi(buf){const d=new DataView(buf),u8=new Uint8Array(buf);let p=0;const str=n=>{let s='';for(let i=0;i<n;i++)s+=String.fromCharCode(u8[p+i]);return s;};
+  if(str(4)!=='MThd')throw new Error('Pas un fichier MIDI');const hl=d.getUint32(4);const ntr=d.getUint16(10),div=d.getUint16(12);if(div&0x8000)throw new Error('ce MIDI utilise un minutage SMPTE (vidéo), non pris en charge : réexporte-le en MIDI standard');p=8+hl;
+  const tracks=[],meta={tempo:null,ts:null,ks:null,name:''};
+  for(let t=0;t<ntr&&p<u8.length;t++){if(str(4)!=='MTrk'){break;}const len=d.getUint32(p+4);let q=p+8;const end=q+len;let tick=0,run=0;const on={},notes=[];
+    const vl=()=>{let v=0,b;do{b=u8[q++];v=(v<<7)|(b&0x7f);}while(b&0x80);return v;};
+    while(q<end){tick+=vl();let st=u8[q];if(st<0x80)st=run;else{q++;if(st<0xF0)run=st;}
+      if(st===0xFF){const ty=u8[q++],l=vl();if(ty===0x51&&meta.tempo==null)meta.tempo=60000000/((u8[q]<<16)|(u8[q+1]<<8)|u8[q+2]);
+        else if(ty===0x58&&!meta.ts)meta.ts=[u8[q],Math.pow(2,u8[q+1])];else if(ty===0x59&&!meta.ks)meta.ks=[(u8[q]<<24)>>24,u8[q+1]];else if((ty===0x03||ty===0x01)&&!meta.name&&l<80){let s='';for(let i=0;i<l;i++)s+=String.fromCharCode(u8[q+i]);meta.name=s.replace(/[\x00-\x1f]/g,'').trim();}q+=l;}
+      else if(st===0xF0||st===0xF7){const l=vl();q+=l;}
+      else{const ty=st&0xF0,ch=st&15;if(ty===0x90||ty===0x80){const k=u8[q++],v=u8[q++],key=ch*128+k;if(ty===0x90&&v>0){(on[key]=on[key]||[]).push([tick,v]);}else if(on[key]&&on[key].length){const[s0]=on[key].shift();if(ch!==9)notes.push([k,s0/div,Math.max(.05,(tick-s0)/div)]);}}
+        else if(ty===0xC0||ty===0xD0)q+=1;else q+=2;}}
+    Object.entries(on).forEach(([key,arr])=>{const ch=Math.floor(key/128),k=key%128;if(ch!==9)arr.forEach(([s0])=>notes.push([k,s0/div,Math.max(.25,(tick-s0)/div)]));});
+    tracks.push(notes);p=end;}
+  const tr=tracks.filter(n=>n.length);if(!tr.length)throw new Error('Aucune note trouvée');
+  let notes;if(tr.length>=2){const avg=tr.map(n=>n.reduce((a,x)=>a+x[0],0)/n.length);const order=avg.map((a,i)=>[a,i]).sort((a,b)=>b[0]-a[0]);
+    notes=tr.flatMap((n,i)=>n.map(x=>[x[0],x[1],x[2],i===order[0][1]?'rh':(order.length>1&&i===order[order.length-1][1]?'lh':(avg[i]>=60?'rh':'lh'))]));}
+  else notes=tr[0].map(x=>[x[0],x[1],x[2],x[0]>=60?'rh':'lh']);
+  return{notes:notes.sort((a,b)=>a[1]-b[1]||a[0]-b[0]),bpm:meta.tempo?Math.round(meta.tempo):100,bpb:meta.ts?Math.round(meta.ts[0]*4/meta.ts[1]):4,ks:meta.ks,name:meta.name};}
+function parseMusicXML(txt){const doc=new DOMParser().parseFromString(txt,'application/xml');if(doc.querySelector('parsererror'))throw new Error('MusicXML illisible');
+  const STEP={C:0,D:2,E:4,F:5,G:7,A:9,B:11},notes=[],harm=[];let bpm=null,bpb=4,ks=null,name=(doc.querySelector('work-title,movement-title')||{}).textContent||'';
+  const parts=[...doc.querySelectorAll('part')];parts.forEach((part,pi)=>{let div=1,t=0,last=0,lastStart=0;const tied={};
+    [...part.querySelectorAll('measure')].forEach(meas=>{const mStart=t;let maxT=t;
+      [...meas.children].forEach(el=>{const tag=el.tagName;
+        if(tag==='attributes'){const dv=el.querySelector('divisions');if(dv)div=+dv.textContent||1;const k=el.querySelector('key fifths');if(k&&!ks)ks=[+k.textContent,(el.querySelector('key mode')||{}).textContent==='minor'?1:0];const b=el.querySelector('time beats'),bt=el.querySelector('time beat-type');if(b&&bt)bpb=+b.textContent*4/+bt.textContent;}
+        else if(tag==='direction'||tag==='sound'){const sn=tag==='sound'?el:el.querySelector('sound');if(sn&&sn.getAttribute('tempo')&&!bpm)bpm=+sn.getAttribute('tempo');}
+        else if(tag==='harmony'){const st=el.querySelector('root-step'),al=el.querySelector('root-alter'),kind=(el.querySelector('kind')||{}).textContent||'major';if(st)harm.push({t,root:st.textContent+(al?(+al.textContent>0?'#':'b'):''),kind});}
+        else if(tag==='backup'){t-=(+el.querySelector('duration').textContent)/div;}
+        else if(tag==='forward'){t+=(+el.querySelector('duration').textContent)/div;maxT=Math.max(maxT,t);}
+        else if(tag==='note'){const du=(+((el.querySelector('duration')||{}).textContent||0))/div,isCh=!!el.querySelector('chord'),start=isCh?lastStart:t;
+          if(!el.querySelector('rest')&&el.querySelector('pitch')&&!el.querySelector('grace')){const s=el.querySelector('pitch step').textContent,al=+((el.querySelector('pitch alter')||{}).textContent||0),oc=+el.querySelector('pitch octave').textContent;
+            const m=12*(oc+1)+STEP[s]+al,stEl=el.querySelector('staff'),staff=+((stEl||{}).textContent||1),h=stEl?(staff>=2?'lh':'rh'):(parts.length>1?(pi>0?'lh':'rh'):(m<60?'lh':'rh')),ties=[...el.querySelectorAll('tie')].map(x=>x.getAttribute('type')),key=m+h;
+            if(ties.includes('stop')&&tied[key]){tied[key][2]+=du;if(!ties.includes('start'))delete tied[key];}else{const n=[m,start,du,h];notes.push(n);if(ties.includes('start'))tied[key]=n;}}
+          if(!isCh){lastStart=t;t+=du;maxT=Math.max(maxT,t);}}});
+      t=Math.max(maxT,mStart);});});
+  if(!notes.length)throw new Error('Aucune note trouvée');return{notes:notes.sort((a,b)=>a[1]-b[1]||a[0]-b[0]),bpm:bpm||100,bpb,ks,name,harm};}
+async function unzipFirstXml(buf){const u8=new Uint8Array(buf),dv=new DataView(buf);let e=u8.length-22;while(e>=0&&dv.getUint32(e,true)!==0x06054b50)e--;if(e<0)throw new Error('Fichier .mxl invalide');
+  const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const files=[];
+  for(let i=0;i<n;i++){const meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),fl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const name=new TextDecoder().decode(u8.slice(p+46,p+46+fl));files.push({name,meth,csz,off});p+=46+fl+xl+cl;}
+  const f=files.find(x=>/\.(xml|musicxml)$/i.test(x.name)&&!/META-INF/i.test(x.name));if(!f)throw new Error('Pas de MusicXML dans le .mxl');
+  const lh=f.off,ds=lh+30+dv.getUint16(lh+26,true)+dv.getUint16(lh+28,true),data=u8.slice(ds,ds+f.csz);
+  if(f.meth===0)return new TextDecoder().decode(data);if(!window.DecompressionStream)throw new Error('Navigateur trop ancien pour les .mxl');
+  const out=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();return new TextDecoder().decode(out);}
+const KS_MAJ=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88],KS_MIN=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+function ksKey(notes){const h=new Array(12).fill(0);notes.forEach(n=>h[mod(n[0])]+=n[2]);const corr=(prof,t)=>{const x=[...Array(12).keys()].map(i=>h[mod(i+t)]),mx=avg(x),my=avg(prof);let a=0,b=0,c=0;for(let i=0;i<12;i++){a+=(x[i]-mx)*(prof[i]-my);b+=(x[i]-mx)**2;c+=(prof[i]-my)**2;}return a/Math.sqrt(b*c||1);};
+  let best=null;for(let t=0;t<12;t++)for(const min of[false,true]){const r=corr(min?KS_MIN:KS_MAJ,t);if(!best||r>best.r)best={t,min,r};}return best;}
+function segChord(notes,a,b){const w=new Array(12).fill(0);let low=null;notes.forEach(n=>{const s=Math.max(a,n[1]),e=Math.min(b,n[1]+n[2]);if(e>s){w[mod(n[0])]+=(e-s)*(n[3]==='lh'?1.3:1);if(n[1]<a+.26&&(!low||n[0]<low))low=n[0];}});
+  const mx=Math.max(...w);if(!mx)return null;const W=w.map(x=>x/mx),D=new Set([...Array(12).keys()].filter(i=>W[i]>=.18)),bass=low==null?null:mod(low);let best=null,bs=-1e9;
+  for(let r=0;r<12;r++)for(const[q0,iv] of MICQ2){const q=q0.trim();if(q==='5')continue;const T=new Set(iv.map(x=>mod(r+x)));let s=0;T.forEach(p=>s+=D.has(p)?W[p]:-.55);D.forEach(p=>{if(!T.has(p))s-=W[p]*1.05;});if(bass===r)s+=.45;if(!D.has(r))s-=.5;s-=iv.length*.04;if(s>bs){bs=s;best={r,q,bass};}}
+  return best;}
+function notesToSong(res,title){const{notes,bpb}=res,ks=res.ks,K=ks?{t:mod((ks[1]?9:0)+ks[0]*7),min:!!ks[1]}:ksKey(notes),fl=[5,10,3,8,1,6].includes(K.min?mod(K.t+3):K.t)||(ks&&ks[0]<0);
+  const N=pc=>(fl?FLAT:SHARP)[mod(pc)],end=Math.max(...notes.map(n=>n[1]+n[2])),nb=Math.max(1,Math.ceil(end/bpb-.01)),bars=[];let prev='C';
+  for(let b=0;b<nb;b++){const half=[0,1].map(h=>{const c=segChord(notes,b*bpb+h*bpb/2,b*bpb+(h+1)*bpb/2);if(!c)return prev;const sym=N(c.r)+c.q+(c.bass!=null&&c.bass!==c.r?'/'+N(c.bass):'');prev=parseChord(sym)?sym:prev;return prev;});
+    bars.push(half[0]===half[1]?half[0]:half.join(' '));}
+  const sections=[];for(let i=0;i<bars.length;i+=8)sections.push({name:'Partie '+(sections.length+1),start:i,repeat:1,bars:bars.slice(i,i+8)});
+  return{id:'s'+Date.now(),title:title||res.name||'Morceau importé',artist:'Importé',version:'Notes de la partition (fichier '+(res.harm?'MusicXML':'MIDI')+')',key:N(K.t)+(K.min?'m':''),bpm:Math.min(200,Math.max(40,res.bpm)),beatsPerBar:bpb,sections,form:sections.map(s=>s.name),
+   notes:notes.map(n=>[n[0],+n[1].toFixed(3),+n[2].toFixed(3),n[3]]),note:`Importé depuis un fichier : ${notes.length} notes, ${nb} mesures. Les accords de la grille sont déduits automatiquement des notes (une estimation : vérifie à l'oreille).`,sources:[]};}
+function notesBarSteps(song,si,bi){const sec=song.sections[si],bpb=song.beatsPerBar||4,ab=(sec.start||0)+bi,a=ab*bpb,b=a+bpb,tag=`${si}-${bi}`,o=S.sTr||0;
+  const ns=song.notes.filter(n=>n[1]>=a-1e-6&&n[1]<b-1e-6),times=[...new Set(ns.map(n=>+n[1].toFixed(3)))].sort((x,y)=>x-y),out=[];
+  if(!times.length)return[{d:bpb,tag}];if(times[0]>a+1e-6)out.push({d:times[0]-a,tag});
+  times.forEach((t,k)=>{const g=ns.filter(n=>Math.abs(n[1]-t)<1e-3),ev=g.map(n=>[n[0]+o,n[2],.9*(n[4]||1),n[3]]),sound=song.notes.filter(n=>n[1]<=t+1e-3&&n[1]+n[2]>t+1e-3);
+    out.push({d:(k<times.length-1?times[k+1]:b)-t,ev,lh:ev.filter(x=>x[3]==='lh').map(x=>x[0]),rh:ev.filter(x=>x[3]==='rh').map(x=>x[0]),show:{lh:sound.filter(n=>n[3]==='lh').map(n=>n[0]+o),rh:sound.filter(n=>n[3]==='rh').map(n=>n[0]+o)},tag});});
+  return out;}
+function folBuildNotes(){const F=S.fol,song=S.song,bpb=song.beatsPerBar||4,secOf=t=>{const ab=Math.floor(t/bpb+1e-6),s=song.sections.find(x=>ab>=(x.start||0)&&ab<(x.start||0)+x.bars.length);return s?s:song.sections[0];};
+  const chordAt=t=>{const ab=Math.floor(t/bpb+1e-6),s=secOf(t),bar=s.bars[ab-(s.start||0)]||'',cs=splitBar(bar);return cs.length>1&&(t/bpb-ab)>=.5?cs[1]:cs[0]||'';};
+  F.ev=[];const ns=song.notes;
+  if(F.gran==='note')ns.forEach((n,i)=>{const nx=ns[i+1];F.ev.push({sym:chordAt(n[1]),t:n[1],d:Math.max(.12,nx?nx[1]-n[1]:n[2]),lh:n[3]==='lh'?[n[0]]:[],rh:n[3]==='rh'?[n[0]]:[],note:n[0],sec:secOf(n[1]).name,first:true,
+    allow:[...new Set(ns.filter(x=>x[1]<n[1]-1e-3&&x[1]+x[2]>n[1]+.05).map(x=>mod(x[0])))]});});
+  else{const times=[...new Set(ns.map(n=>+n[1].toFixed(3)))].sort((a,b)=>a-b);times.forEach((t,k)=>{const g=ns.filter(n=>Math.abs(n[1]-t)<1e-3),pcs=[...new Set(g.map(n=>mod(n[0])))].sort();const ord=[...g].sort((a,b)=>a[0]-b[0]);
+    let ess=pcs;if(pcs.length>4){const lo=mod(ord[0][0]),hi=mod(ord[ord.length-1][0]);ess=[...new Set([lo,hi,...pcs.filter(p=>p!==lo&&p!==hi).slice(0,2)])];}
+    const sound=ns.filter(n=>n[1]<t-1e-3&&n[1]+n[2]>t+.05).map(n=>mod(n[0]));
+    F.ev.push({sym:chordAt(t),t,d:Math.max(.1,(times[k+1]??t+1)-t),lh:g.filter(n=>n[3]==='lh').map(n=>n[0]),rh:g.filter(n=>n[3]==='rh').map(n=>n[0]),sec:secOf(t).name,ess,all:pcs,allow:[...new Set(sound)]});});}
+  const all=ns.map(n=>n[0]);F.lo=Math.floor(Math.min(...all)/12)*12;F.hi=Math.ceil((Math.max(...all)+1)/12)*12-1;if(F.hi-F.lo<35)F.hi=F.lo+35;if(F.hi-F.lo>60){F.lo=Math.max(F.lo,24);F.hi=Math.min(F.hi,F.lo+60);}
+  F.i=0;F.t=-3;F.ok=0;F.skip=0;F.done=false;folReset();}
+
+/* ============ IMPROVISER : LES TRAITS QUI IMPRESSIONNENT ============ */
+S.run={type:'penta',dir:'down',n:10,speed:1};
+const RUNS={
+ penta:{n:'Run pentatonique',ic:'🌊',what:'Les 5 notes de la pentatonique en cascade : comme il n\'y a aucun demi-ton, impossible de faire une fausse note, même vite.',when:'En fin de phrase, ou pour remplir un accord tenu. Le geste préféré des pianistes gospel et pop.',fing:'Groupes de 3 doigts (1-2-3) puis 2 doigts (1-2) : la main se déplace par blocs, le pouce passe dessous.',trap:'Ne pas accélérer en route : la régularité impressionne plus que la vitesse.',dirs:['up','down']},
+ scale:{n:'Gamme fusée',ic:'🚀',what:'La gamme complète, d\'un seul souffle, sur une ou deux octaves.',when:'Pour monter vers un refrain ou relancer une section : l\'effet « fusée ».',fing:'Le doigté de la gamme de la tonalité, avec passages du pouce réguliers.',trap:'Le passage du pouce doit être préparé avant, pas au dernier moment.',dirs:['up','down']},
+ arp:{n:'Arpège en cascade',ic:'🎆',what:'Les notes de l\'accord de tonique (1-3-5) répétées octave après octave.',when:'Pour finir un morceau en beauté ou ouvrir une introduction.',fing:'1-2-3 puis le pouce passe sous le 3 ; à la fin, 1-2-3-5.',trap:'Garder le poignet souple : il glisse latéralement, il ne saute pas.',dirs:['up','down']},
+ seq3:{n:'Groupes de 3',ic:'🔁',what:'Une séquence : 1-2-3, 2-3-4, 3-4-5… Le même petit motif qui monte (ou descend) d\'une note à chaque fois.',when:'Pour une montée qui sonne « travaillée » et classique.',fing:'1-2-3 sur chaque groupe : la main recommence au même doigt, elle se décale d\'une touche.',trap:'Accentuer légèrement la 1re note de chaque groupe pour que l\'oreille entende le motif.',dirs:['up','down']},
+ seq4:{n:'Groupes de 4',ic:'🎢',what:'Comme les groupes de 3, avec 4 notes : 4-3-2-1, 5-4-3-2… très bebop et très efficace en descente.',when:'Sur un accord tenu, ou pour descendre vers la tonique.',fing:'4-3-2-1 à la main droite, puis la main recule d\'une touche.',trap:'Ne pas perdre le compte : pense par groupes, pas par notes.',dirs:['up','down']},
+ alt:{n:'Mains alternées',ic:'🙌',what:'La main gauche joue 3 notes, la droite enchaîne 3 notes plus haut, puis la gauche passe au-dessus… On traverse tout le clavier très vite avec peu d\'effort.',when:'Le grand final gospel et soul : c\'est le trait qui impressionne le plus pour le moins de technique.',fing:'MG 3-2-1, MD 1-2-3, et on recommence plus loin. Chaque main ne joue jamais plus de 3 notes.',trap:'Bien enchaîner les mains sans trou : le dernier doigt de l\'une et le premier de l\'autre sont presque collés.',dirs:['up','down']},
+ chrom:{n:'Arrivée chromatique',ic:'🎯',what:'Un run pentatonique qui se termine par 3 demi-tons glissés vers la note cible.',when:'Pour atterrir avec élégance sur la tonique ou la tierce du prochain accord.',fing:'Pour les demi-tons : 3-2-1 (ou 2-1 en glissant le doigt sur la touche noire).',trap:'La note cible doit tomber pile sur le temps.',dirs:['down','up']}};
+function runNotes(){const R=S.run,tp=gpc(),min=IGEN[S.imp.g]&&IGEN[S.imp.g].min,n=R.n,up=R.dir==='up';
+  const pent=min?[0,3,5,7,10]:[0,2,4,7,9],scale=min?MIN:MAJ,tri=min?[0,3,7]:[0,4,7];
+  const ladder=(ints,lo,hi)=>{const out=[];for(let m=lo;m<=hi;m++)if(ints.includes(mod(m-tp)))out.push(m);return out;};
+  const anchor=L=>{let i=L.findIndex(m=>m>=55&&mod(m-tp)===0);return i<0?0:i;};
+  const take=(L,k)=>{if(up){let i=anchor(L);if(i+k>L.length)i=Math.max(0,L.length-k);return L.slice(i,i+k);}let e=anchor(L);if(e+k>L.length)e=Math.max(0,L.length-k);return L.slice(e,e+k).reverse();};
+  let seq=[],hand=null;
+  if(R.type==='penta')seq=take(ladder(pent,43,98),n);
+  else if(R.type==='scale')seq=take(ladder(scale,43,98),n);
+  else if(R.type==='arp')seq=take(ladder(tri,36,98),n);
+  else if(R.type==='chrom'){const body=take(ladder(pent,43,98),Math.max(2,n-3));const last=body[body.length-1];
+    if(up){const tg=ladder([0,tri[1]],last+3,last+14)[0];seq=[...body,tg-3,tg-2,tg-1,tg].slice(-n);}else{const tg=ladder([0,tri[1]],last-14,last-3).pop();seq=[...body,tg+3,tg+2,tg+1,tg].slice(-n);}
+    if(seq.length<n)seq=[...body.slice(0,n-seq.length),...seq];seq=seq.slice(0,n);}
+  else if(R.type==='seq3'||R.type==='seq4'){const g=R.type==='seq3'?3:4,L=ladder(scale,43,98),groups=Math.ceil(n/g)+g;let s0=anchor(L);if(!up)s0=Math.min(L.length-1,s0+groups);if(up&&s0+groups>=L.length)s0=Math.max(0,L.length-groups-1);
+    let s=s0;while(seq.length<n){for(let k=0;k<g&&seq.length<n;k++)seq.push(L[up?s+k:s-k]);s+=up?1:-1;}}
+  else if(R.type==='alt'){const L=ladder(pent,38,98);let i=up?L.findIndex(m=>m>=43):L.length-1,h=up?'lh':'rh';if(!up)while(L[i]>96)i--;hand=[];
+    while(seq.length<n&&L[i]!=null){for(let k=0;k<3&&seq.length<n&&L[i]!=null;k++){seq.push(L[i]);hand.push(h);i+=up?1:-1;}h=h==='lh'?'rh':'lh';}}
+  seq=seq.filter(x=>x!=null);return{seq,hand};}
+function runFingers(seq,hand,type,up){const F=[];if(type==='alt'){let k=0;hand.forEach((h,i)=>{const pos=i%3;F.push(h==='lh'?(up?[3,2,1]:[1,2,3])[pos]:(up?[1,2,3]:[3,2,1])[pos]);});return F;}
+  if(type==='seq3'||type==='seq4'){const g=type==='seq3'?3:4;return seq.map((_,i)=>up?(i%g)+1:g-(i%g));}
+  const cyc=type==='scale'?(up?[1,2,3,1,2,3,4]:[4,3,2,1,3,2,1]):type==='arp'?(up?[1,2,3]:[3,2,1]):(up?[1,2,3,1,2]:[3,2,1,2,1]);
+  seq.forEach((_,i)=>F.push(cyc[i%cyc.length]));if(up&&seq.length>2)F[F.length-1]=Math.min(5,Math.max(F[F.length-1],4));return F;}
+function runSteps(){const R=S.run,{seq,hand}=runNotes(),up=R.dir==='up',f=runFingers(seq,hand||seq.map(()=>'rh'),R.type,up),d=R.type==='alt'?1/3:.25;
+  const tp=gpc(),ch=stack([0,4,7].map(i=>mod(tp+i+(IGEN[S.imp.g]&&IGEN[S.imp.g].min&&i===4?-1:0))),60-(tp>6?12:0));
+  return[{lh:[ch[0]-12],rh:[],d:.5,sus:seq.length*d+1},...seq.map((m,i)=>{const h=hand?hand[i]:'rh';return{[h]:[m],[h==='lh'?'lhF':'rhF']:[f[i]],d,sus:.4,vel:i===seq.length-1?1.15:1};}),{d:1}];}
+function runsHTML(){const R=S.run,T=RUNS[R.type],steps=runSteps(),bpm=[60,90,120][R.speed];
+  return`<h2>5 · Les traits qui impressionnent</h2>
+  <p class="small">Des enchaînements de 5 à 14 notes d'affilée, en montée ou en descente, dans la tonalité choisie en haut. C'est ce qu'on remarque tout de suite dans un solo, et c'est beaucoup plus accessible qu'il n'y paraît.</p>
+  <div class="card"><div class="chips">${Object.entries(RUNS).map(([k,x])=>`<button class="chip ${R.type===k?'on':''}" data-runt="${k}">${x.ic} ${x.n}</button>`).join('')}</div>
+   <div class="row"><div class="seg">${T.dirs.map(dd=>`<button data-rund="${dd}" class="${R.dir===dd?'on':''}">${dd==='up'?'↗ Montée':'↘ Descente'}</button>`).join('')}</div>
+    <div class="seg">${[5,7,10,14].map(n=>`<button data-runn="${n}" class="${R.n===n?'on':''}">${n} notes</button>`).join('')}</div>
+    <div class="seg">${['Lent','Moyen','Rapide'].map((x,i)=>`<button data-runs="${i}" class="${R.speed===i?'on':''}">${x}</button>`).join('')}</div></div></div>
+  ${exCard({keyAware:1,tag:T.ic+' '+(R.dir==='up'?'Montée':'Descente'),title:`${T.n} · ${steps.length-2} notes`,desc:T.what,steps,bpm,display:'all',
+   extra:`<div class="rinfo"><p><span class="lbl">🎯 Quand l'utiliser :</span> ${T.when}</p><p><span class="lbl">✋ Doigté :</span> ${T.fing}</p><p><span class="lbl">⚠️ Le piège :</span> ${T.trap}</p></div>`})}
+  <div class="card"><h3>La méthode pour les apprendre</h3><ol class="clean">
+   <li><b>Par paquets :</b> découpe le trait en groupes de 3 ou 4 notes. Joue chaque groupe comme un accord plaqué, puis égrené.</li>
+   <li><b>À l'envers :</b> apprends d'abord les 3 dernières notes (l'arrivée), puis ajoute un groupe devant, et ainsi de suite. L'arrivée sera toujours solide.</li>
+   <li><b>En rythmes :</b> joue le trait en long-court, puis court-long. Après ça, le rythme régulier paraît facile.</li>
+   <li><b>Au métronome :</b> commence à 60 en croches, monte de 5 bpm par jour. À 120 en doubles croches, ça impressionne.</li>
+   <li><b>Pense au geste :</b> le poignet guide, les doigts suivent. Regarde la note d'arrivée, pas chaque note.</li></ol>
+   <div class="tip p"><b>L'astuce des pros</b>Un trait rapide qui finit pile sur le temps fort, sur la tonique ou la tierce, fait toujours plus d'effet qu'un trait long mais hésitant. Termine fort, puis laisse un silence.</div></div>`;}
+
+
+/* ============ OUTILS D'EXEMPLES (accords + mélodie, en Do, transposés) ============ */
+function cx(title,chords,desc,extra,pat){const syms=chords.map(c=>Array.isArray(c)?c[0]:c),beats=chords.map(c=>Array.isArray(c)?c[1]:4);
+  return exCard({title,desc,bpm:80,steps:patSteps(syms,pat||'block',beats),base:patSteps(syms,'block',beats),extra});}
+function mx(title,chords,mel,desc,extra,bpm){const syms=chords.map(c=>c[0]),beats=chords.map(c=>c[1]),acc=patSteps(syms,'block',beats).map(s=>({...s,vel:.8}));
+  let t=0;const items=mel.map(([m,d])=>{const it={bar:0,t,d,m};t+=d;return it;});const tot=Math.max(beats.reduce((a,b)=>a+b,0),t);
+  return exCard({title,desc,bpm:bpm||80,steps:mergeTL(acc,items,tot),base:patSteps(syms,'block',beats),extra,display:'all'});}
+const symRow=chords=>`<p class="notes" style="margin:4px 0">${chords.map(c=>`<b>${symLabel(trSymOff(Array.isArray(c)?c[0]:c,gOffG())).replace(/#/g,'♯')}</b>`).join(' – ')}</p>`;
+
+/* ============ IMPRO : ENRICHIR LES DEGRÉS ============ */
+S.im2={dev:0,tg:'gospel',tr:0,ie:'intro',ii:0,lc:'all'};
+const DEVICES=[
+ {n:'Dominante secondaire',ic:'🧲',f:'Avant un accord X, joue le V7 de X.',before:[['C',4],['Am',4],['Dm',4],['G',4]],after:[['C',2],['E7',2],['Am',2],['A7',2],['Dm',2],['G7',2],['C',4]],
+  why:'Le V7 « tire » vers l\'accord suivant comme s\'il était une tonique : la grille avance avec élan. E7 prépare Am, A7 prépare Dm.',impro:'Sur E7, joue Sol♯ (sa tierce) : il monte d\'un demi-ton vers La, la fondamentale de Am. Sur A7, Do♯ monte vers Ré.'},
+ {n:'Tierce à la basse',ic:'🪜',f:'Joue l\'accord avec sa tierce en bas (C/E, G/B…) pour que la basse avance par petits pas.',before:[['C',4],['G',4],['Am',4],['F',4]],after:[['C',4],['G/B',4],['Am',4],['F',2],['C/E',2],['Dm7',2],['G',2],['C',4]],
+  why:'La basse descend Do – Si – La : une vraie ligne mélodique au lieu de sauts. C\'est l\'accompagnement de « Let It Be », du Canon de Pachelbel, de mille ballades.',impro:'Écoute la basse : quand elle descend par degrés, ta mélodie peut monter en sens contraire. C\'est le mouvement contraire, très élégant.'},
+ {n:'Diminué de passage',ic:'🌉',f:'Entre deux accords à un ton d\'écart, glisse l\'accord diminué un demi-ton au-dessus du premier.',before:[['C',4],['Dm7',4],['C/E',4],['F',4]],after:[['C',2],['C#dim7',2],['Dm7',2],['D#dim7',2],['C/E',2],['F',2],['F#dim7',2],['C/G',2]],
+  why:'La basse monte chromatiquement (Do – Do♯ – Ré – Ré♯ – Mi…) et chaque diminué crée une petite tension qui se résout aussitôt. Très gospel, très Broadway.',impro:'Sur un diminué, joue un arpège diminué (notes à 3 demi-tons) : il sonne toujours juste.'},
+ {n:'Substitution tritonique',ic:'🔀',f:'Remplace V7 par l\'accord 7 situé un triton plus loin (G7 → D♭7).',before:[['Dm7',4],['G7',4],['Cmaj7',8]],after:[['Dm7',4],['Db7',4],['Cmaj7',8]],
+  why:'G7 et D♭7 partagent les mêmes notes guides (Si et Fa) : ils ont la même fonction. Mais la basse descend Ré – Ré♭ – Do, par demi-tons : c\'est soyeux et très jazz.',impro:'Sur D♭7, la note La♭ (sa quinte) puis Sol donne une glissade magnifique vers Cmaj7.'},
+ {n:'Le ii–V inséré',ic:'➕',f:'Devant un accord, ajoute son ii–V (2 temps chacun).',before:[['C',8],['F',8]],after:[['C',4],['Gm7',2],['C7',2],['F',8]],
+  why:'Tu fabriques une mini-cadence vers n\'importe quel accord : ça crée du mouvement là où l\'accord était statique.',impro:'Sur Gm7 – C7, vise Mi (tierce de C7) puis Fa : la flèche de la cadence.'},
+ {n:'L\'emprunt au mineur',ic:'🌗',f:'Emprunte iv, ♭VI ou ♭VII à la tonalité mineure de même tonique.',before:[['C',4],['F',4],['C',8]],after:[['C',4],['F',2],['Fm',2],['Ab',2],['Bb',2],['C',4]],
+  why:'Fm (avec son La♭) donne une larme dans un contexte majeur ; ♭VI – ♭VII – I sonne comme une victoire de film.',impro:'Sur Fm, joue La♭ qui descend vers Sol : la plus belle note du morceau.'},
+ {n:'La pédale de basse',ic:'⚓',f:'Garde la même note à la basse pendant que les accords changent au-dessus.',before:[['C',4],['F',4],['G',4],['C',4]],after:[['C',4],['F/C',4],['G/C',4],['C',4]],
+  why:'La basse immobile crée une attente, une tension qui monte : parfait pour une intro ou un final.',impro:'Joue la pentatonique de la tonique par-dessus : elle colle à toute la pédale.'},
+ {n:'Le sus avant la résolution',ic:'⏳',f:'Avant V7, joue Vsus4 : la 4te attend, puis descend sur la tierce.',before:[['G7',4],['C',4]],after:[['G7sus4',2],['G7',2],['C',4]],
+  why:'Le retard sus4 → 3 rend la résolution plus désirée. Indispensable en pop et en gospel.',impro:'Chante la 4te (Do) puis laisse-la descendre sur Si : tu entends le soupir.'},
+ {n:'Le backdoor',ic:'🚪',f:'Arrive sur I par ♭VII7 (ou iv7 – ♭VII7) au lieu de V7.',before:[['Dm7',4],['G7',4],['Cmaj7',8]],after:[['Fm7',4],['Bb7',4],['Cmaj7',8]],
+  why:'On rentre « par la porte de derrière » : la résolution est plus douce, plus soul.',impro:'Sur B♭7, La♭ puis Sol : encore une glissade vers la quinte de C.'},
+ {n:'Le glissement chromatique',ic:'🛝',f:'Joue le même accord un demi-ton au-dessus, puis reviens.',before:[['Dm7',8],['G7',4],['Cmaj7',4]],after:[['Dm7',2],['Ebm7',2],['Dm7',4],['G7',4],['Cmaj7',4]],
+  why:'Un « side-slip » : une tension passagère qui fait sourire l\'oreille. Très jazz et city pop.',impro:'Pendant le glissement, joue ta phrase aussi un demi-ton plus haut, puis redescends.'}];
+const TRICKS={
+ gospel:[{n:'Le walk-up',c:[['C',2],['Dm7',.5],['C/E',.5],['F',1],['F',4]],d:'La basse monte Do – Ré – Mi pour amener Fa. La signature du gospel et de la soul.'},
+  {n:'IV/V avant la reprise',c:[['C',2],['F/G',2],['C',4]],d:'L\'accord F/G (IV sur la basse du V) remplace G7 : plus doux, plus « église ».'},
+  {n:'Le 2-5 éclair',c:[['C',2],['Dm7',1],['G7',1],['C',4]],d:'Deux accords rapides sur les deux derniers temps : on relance la mesure suivante.'},
+  {n:'Le 7-3-6',c:[['C',2],['Bm7b5',1],['E7',1],['Am7',4]],d:'Une mini-cadence vers vi : la parenthèse émotion avant le couplet.'},
+  {n:'Le I – I7 – IV – iv',c:[['C',1],['C7',1],['F',1],['Fm',1],['C',4]],d:'Le « amen » chromatique : la voix intérieure descend Si♭ – La – La♭ – Sol.'},
+  {n:'Le diminué qui monte',c:[['F',2],['F#dim7',2],['C/G',4]],d:'Le diminué de passage entre IV et I/5 : la basse monte Fa – Fa♯ – Sol.'}],
+ jazz:[{n:'Turnaround I – vi – ii – V',c:[['Cmaj7',1],['A7',1],['Dm7',1],['G7',1],['Cmaj7',4]],d:'La boucle de fin de grille qui ramène au début, avec A7 en dominante secondaire.'},
+  {n:'Turnaround tritonique',c:[['Cmaj7',1],['Eb7',1],['Ab7',1],['Db7',1],['Cmaj7',4]],d:'Chaque accord est le substitut tritonique du turnaround classique : très chic.'},
+  {n:'Le backdoor',c:[['Fm7',2],['Bb7',2],['Cmaj7',4]],d:'iv7 – ♭VII7 – I : la résolution douce des standards.'},
+  {n:'Le side-slip',c:[['Dm7',1],['Ebm7',1],['Dm7',1],['G7',1],['Cmaj7',4]],d:'Un demi-ton au-dessus et retour : une parenthèse qui fait sourire.'}],
+ pop:[{n:'Le sus4 de retour',c:[['G',2],['Gsus4',1],['G',1],['C',4]],d:'Le petit balancement sus4 – 3 avant de revenir à la tonique.'},
+  {n:'Le ♭VII de relance',c:[['C',2],['Bb',2],['C',4]],d:'Un accord emprunté qui relance l\'énergie, très rock et pop.'},
+  {n:'Le iv mineur',c:[['F',2],['Fm',2],['C',4]],d:'La larme avant le refrain : Fm entre F et C.'}],
+ blues:[{n:'Le turnaround blues',c:[['C7',1],['C7/E',1],['F7',1],['F#dim7',1],['C7/G',1],['A7',1],['D7',1],['G7',1]],d:'Les deux dernières mesures du blues : la basse monte puis les dominantes s\'enchaînent.'},
+  {n:'Le quick change',c:[['C7',2],['F7',2],['C7',4]],d:'Un IV7 rapide dans la 2e mesure : le blues respire.'}],
+ city:[{n:'IVmaj7 – III7 – vi',c:[['Fmaj7',2],['E7',2],['Am9',4]],d:'La cadence vers vi par sa dominante : l\'âme de la city pop.'},
+  {n:'La montée chromatique',c:[['Dm9',2],['Ebm9',2],['Em9',2],['A7',2]],d:'Les accords montent par demi-tons : une parenthèse qui fait monter la tension.'}],
+ bossa:[{n:'Le ♭II7 avant I',c:[['Dm9',2],['Db9',2],['Cmaj9',4]],d:'La substitution tritonique, omniprésente chez Jobim.'},
+  {n:'Le I – ♭II°',c:[['Cmaj7',2],['C#dim7',2],['Dm7',2],['G7',2]],d:'Le diminué chromatique entre I et ii.'}],
+ film:[{n:'La médiante ♭VI',c:[['C',2],['Ab',2],['C',4]],d:'Deux accords majeurs à une tierce : l\'émerveillement des musiques de film.'},
+  {n:'Le II lydien',c:[['C',2],['D',2],['C',4]],d:'Le D majeur en Do : la couleur lydienne, magique et aérienne.'}]};
+const INTROS=[
+ {n:'La dominante qui tourne',c:[['G7sus4',4],['G7',4],['C',4]],m:[[67,1],[69,.5],[67,.5],[65,1],[62,1],[71,1.5],[72,.5],[74,1],[71,1],[72,4]],d:'On commence sur le V : l\'oreille attend la tonique, l\'entrée du morceau devient une délivrance.'},
+ {n:'L\'arpège qui s\'ouvre',c:[['Cadd9',4],['Fmaj7',4],['Cadd9',4]],m:[[76,2],[74,2],[72,4],[79,2],[76,2]],d:'Deux accords riches, joués lentement avec pédale : idéal pour une ballade.'},
+ {n:'Le walk-up gospel',c:[['C',1],['Dm7',1],['C/E',1],['F',1],['F/G',4],['C',4]],m:[[72,4],[74,2],[77,2],[76,4]],d:'La basse monte vers le IV, puis IV/V lance le morceau.'},
+ {n:'Le tag jazz',c:[['Dm7',2],['G7',2],['Cmaj7',2],['A7',2],['Dm7',2],['G7',2],['Cmaj9',4]],m:[[77,1],[76,1],[74,1],[71,1],[72,2],[73,2],[74,1],[77,1],[71,2],[76,4]],d:'Deux ii–V–I enchaînés : l\'intro standard des clubs de jazz.'},
+ {n:'La cascade d\'ouverture',c:[['C6/9',4],['Cadd9',4]],m:[[88,.25],[86,.25],[84,.25],[81,.25],[79,.25],[76,.25],[74,.25],[72,.25],[69,.25],[67,.25],[64,1.5],[76,4]],d:'Un run pentatonique descendant qui atterrit sur la tonique : l\'entrée spectaculaire.'},
+ {n:'La fin du refrain en intro',c:[['Fmaj7',2],['G7',2],['Em7',2],['Am7',2],['Dm7',2],['G7sus4',2],['C',4]],m:[[72,2],[74,2],[71,2],[72,2],[69,2],[74,2],[72,4]],d:'On joue la fin du refrain avant le début : le public reconnaît le morceau tout de suite.'}];
+const ENDINGS=[
+ {n:'La victoire ♭VI – ♭VII – I',c:[['Ab',2],['Bb',2],['C',4]],m:[[72,1],[75,1],[74,1],[77,1],[79,4]],d:'Deux accords empruntés qui montent vers la tonique : la fin héroïque.'},
+ {n:'La larme IV – iv – I',c:[['F',2],['Fm',2],['C',4]],m:[[69,2],[68,2],[67,4]],d:'La voix intérieure descend La – La♭ – Sol : une fin tendre.'},
+ {n:'La tierce picarde',c:[['Am',2],['Dm',2],['E7',2],['A',4]],m:[[72,2],[74,2],[71,1],[68,1],[73,4]],d:'Un morceau mineur qui finit sur l\'accord majeur : la lumière au bout du chemin.'},
+ {n:'Ralenti et accord roulé',c:[['G7sus4',2],['G7',2],['Cadd9',4]],m:[[74,1],[72,1],[71,2],[76,1],[74,1],[72,2]],d:'Ralentis sur les 2 dernières mesures, puis égrène l\'accord final du grave vers l\'aigu.'},
+ {n:'Le tag 3-6-2-5',c:[['Em7',1],['A7',1],['Dm7',1],['G7',1],['Em7',1],['A7',1],['Dm7',1],['G7',1],['Cmaj9',4]],m:[[71,1],[73,1],[72,1],[71,1],[71,1],[73,1],[77,1],[74,1],[76,4]],d:'On retarde la fin en répétant la cadence : le public sent la fin arriver.'},
+ {n:'Le tritonique final',c:[['Dm9',2],['Db7',2],['Cmaj9',4]],m:[[76,1],[74,1],[77,2],[76,4]],d:'D♭7 à la place de G7 : la basse glisse Ré – Ré♭ – Do.'},
+ {n:'Le run gospel',c:[['F/G',2],['C',4]],m:[[81,.25],[79,.25],[76,.25],[74,.25],[72,.25],[69,.25],[67,.25],[64,.25],[72,4]],d:'Une cascade pentatonique sur IV/V, puis la tonique.'},
+ {n:'Les trois coups',c:[['G7',2],['C6',.5],['C6',.5],['C6',1]],m:[],d:'Trois accords secs pour finir : la fin big band à la Count Basie.'},
+ {n:'La fin suspendue',c:[['Dm9',2],['Fmaj7#11',4]],m:[[76,2],[83,4]],d:'On ne revient pas à la tonique : la fin reste ouverte, rêveuse.'}];
+const LICKS2=[
+ {c:'blues',n:'La note bleue',ctx:[['C7',4]],m:[[63,.25],[64,.75],[67,.5],[69,.5],[67,.5],[64,.5],[60,1]],w:'La tierce mineure glisse sur la majeure (♭3 → 3), puis on descend vers la tonique.',u:'Sur l\'accord I d\'un blues, en début de phrase.',f:'2 sur ♭3 qui glisse sur 3 (même doigt), puis 1-2-3.'},
+ {c:'blues',n:'Le turnaround descendant',ctx:[['C7',2],['G7',2]],m:[[70,.5],[69,.5],[68,.5],[67,.5],[64,2]],w:'Une ligne chromatique qui descend de la ♭7 vers la quinte : la fin de grille blues.',u:'Les deux dernières mesures d\'un blues.',f:'4-3-2-1, puis la main recule.'},
+ {c:'blues',n:'Le triolet du boogie',ctx:[['C7',3]],m:[[67,.33],[70,.33],[72,.34],[70,.33],[67,.33],[64,.34],[60,1]],w:'Un aller-retour en triolets sur les notes de l\'accord avec la ♭7.',u:'Au début ou à la fin d\'une phrase boogie.',f:'1-2-3-2-1 puis pouce sous.'},
+ {c:'gospel',n:'La broderie gospel',ctx:[['C',4]],m:[[76,.25],[77,.25],[76,.5],[74,.5],[72,.5],[74,.5],[72,1.5]],w:'Un petit ornement rapide autour de la tierce, puis descente vers la tonique.',u:'En réponse à une phrase chantée.',f:'3-4-3-2-1-2-1.'},
+ {c:'gospel',n:'Le crush 6 – ♭3 – 3',ctx:[['C',4]],m:[[69,.5],[63,.25],[64,.75],[60,2.5]],w:'La 6te puis le frottement ♭3 – 3 : le cri de joie du gospel.',u:'Sur la tonique, en fin de phrase.',f:'5 sur la 6te, 2 glisse de ♭3 à 3, 1 sur la tonique.'},
+ {c:'jazz',n:'La ligne ii–V–I',ctx:[['Dm7',2],['G7',2],['Cmaj7',4]],m:[[65,.5],[69,.5],[72,.5],[76,.5],[74,.5],[71,.5],[67,.5],[65,.5],[64,4]],w:'Arpège montant de Dm7, puis descente qui passe par la 7e de G7 (Fa) et atterrit sur la tierce de C (Mi).',u:'Sur n\'importe quel ii–V–I : apprends-la dans les 12 tonalités.',f:'1-2-3-5, puis 4-3-2-1 et 2 sur Mi.'},
+ {c:'jazz',n:'L\'arpège maj9',ctx:[['Cmaj9',4]],m:[[64,.5],[67,.5],[71,.5],[74,.5],[76,2]],w:'On arpège depuis la tierce : 3-5-7-9. Le son des pianistes modernes.',u:'Sur un accord majeur tenu.',f:'1-2-3-5, puis glisser vers Mi.'},
+ {c:'jazz',n:'La descente bebop',ctx:[['G7',4],['C',2]],m:[[77,.5],[76,.5],[74,.5],[73,.5],[74,.5],[71,.5],[67,.5],[65,.5],[64,2]],w:'Une descente avec une note chromatique (Do♯) et un encadrement pour tomber sur Mi.',u:'Sur V7 qui résout sur I.',f:'5-4-3-2-3-1, passage du 3 au-dessus du pouce.'},
+ {c:'pop',n:'La réponse pentatonique',ctx:[['C',4]],m:[[67,.5],[69,.5],[72,1],[69,.5],[67,.5],[64,1]],w:'Six notes de la pentatonique en arche : monte, puis redescend.',u:'Entre deux phrases chantées.',f:'1-2-4-2-1, et le pouce passe sous pour Mi.'},
+ {c:'pop',n:'Le sus qui se résout',ctx:[['Csus4',2],['C',2]],m:[[65,1],[64,1],[62,.5],[64,1.5]],w:'La 4te descend sur la tierce, puis une petite broderie.',u:'À la fin d\'un couplet.',f:'3-2-1-2.'},
+ {c:'classique',n:'Le gruppetto',ctx:[['C',3]],m:[[74,.25],[72,.25],[71,.25],[72,.25],[76,2]],w:'Un tour rapide autour d\'une note (au-dessus, la note, en dessous, la note) avant de sauter.',u:'Pour orner une note longue, comme Mozart.',f:'3-2-1-2, puis 4 sur Mi.'},
+ {c:'classique',n:'L\'arpège brisé',ctx:[['C',4]],m:[[60,.25],[67,.25],[64,.25],[67,.25],[60,.25],[67,.25],[64,.25],[67,.25],[72,2]],w:'La basse d\'Alberti jouée à la main droite, puis l\'octave.',u:'Pour une transition classique.',f:'1-5-3-5, puis 5 sur l\'octave.'},
+ {c:'neo',n:'La 9e qui flotte',ctx:[['Fmaj9',4]],m:[[74,.75],[76,.25],[79,.5],[81,.5],[79,.5],[74,1.5]],w:'La mélodie tourne autour de la 6te et de la 9e de l\'accord : un son suspendu, moderne.',u:'Sur un IVmaj7 en city pop ou neo-soul.',f:'1-2-3-4-3-1.'},
+ {c:'neo',n:'Le glissé R&B',ctx:[['Am9',4]],m:[[70,.25],[71,.25],[72,.5],[69,.5],[67,1],[64,1.5]],w:'Deux demi-tons glissés vers Do, puis la pentatonique mineure.',u:'Sur un accord mineur, à la fin d\'une phrase.',f:'2-3-4 (glisser), 3-2-1.'},
+ {c:'film',n:'Le saut de l\'aventure',ctx:[['C',2],['G',2],['Am',2]],m:[[60,.5],[67,1],[72,1.5],[71,.5],[67,.5],[69,2]],w:'Quinte puis quarte vers le haut : l\'élan héroïque, puis la retombée.',u:'Pour un thème de film ou une intro épique.',f:'1-3-5, puis 4-2-3.'},
+ {c:'latin',n:'La cellule bossa',ctx:[['Cmaj7',4]],m:[[76,.5],[74,1],[72,.5],[71,1],[72,1]],w:'Une phrase syncopée autour de la 7e majeure : la douceur brésilienne.',u:'Sur Cmaj7 ou Dm7 dans une bossa.',f:'3-2-1, puis le pouce passe sous pour Si.'}];
+const LCAT={all:'Tous',blues:'Blues',gospel:'Gospel',jazz:'Jazz',pop:'Pop',classique:'Classique',neo:'City pop · neo-soul',film:'Film',latin:'Latin'};
+function improPlusHTML(){const M=S.im2,D=DEVICES[M.dev],tl=TRICKS[M.tg]||TRICKS.gospel,T=tl[Math.min(M.tr,tl.length-1)],IE=M.ie==='intro'?INTROS:ENDINGS,X=IE[Math.min(M.ii,IE.length-1)],L=LICKS2.filter(l=>M.lc==='all'||l.c===M.lc);
+  return`<h2>Enrichir les degrés</h2>
+  <p class="small">Dix procédés pour rendre une grille plus vivante. Chacun change un peu les accords, et te donne une note à viser dans ton impro. Les exemples suivent la tonalité choisie en haut.</p>
+  <div class="chips sm">${DEVICES.map((x,i)=>`<button class="chip ${M.dev===i?'on':''}" data-imdev="${i}">${x.ic} ${x.n}</button>`).join('')}</div>
+  <div class="card"><h3>${D.ic} ${D.n}</h3><div class="vform"><b>La règle</b>${D.f}</div><p>${D.why}</p>
+   <div class="g2">${cx('Avant',D.before)}${cx('Après',D.after)}</div>
+   <div class="tip p"><b>🎹 Pour ton impro</b>${D.impro}</div>
+   <div class="row"><button class="chip" data-imtry="${M.dev}">🎲 Improviser sur la version « après »</button></div></div>
+
+  <h2>Les petites parenthèses du genre</h2>
+  <p class="small">Ces « tricks » se glissent juste avant de reprendre un accord ou une section : une demi-mesure qui montre que tu sais jouer.</p>
+  <div class="chips sm">${Object.keys(TRICKS).map(g=>`<button class="chip ${M.tg===g?'on':''}" data-imtg="${g}">${{gospel:'Gospel',jazz:'Jazz',pop:'Pop',blues:'Blues',city:'City pop',bossa:'Bossa',film:'Film',anime:'Anime',cartoon:'Dessin animé',game:'Jeux vidéo'}[g]}</button>`).join('')}</div>
+  <div class="chips sm">${tl.map((x,i)=>`<button class="chip ${M.tr===i?'on':''}" data-imtr="${i}">${x.n}</button>`).join('')}</div>
+  ${cx(T.n,T.c,T.d,symRow(T.c))}
+
+  <h2>Débuts et fins stylés</h2>
+  <div class="row"><div class="seg"><button data-imie="intro" class="${M.ie==='intro'?'on':''}">🎬 Débuts</button><button data-imie="end" class="${M.ie==='end'?'on':''}">🎆 Fins</button></div></div>
+  <div class="chips sm">${IE.map((x,i)=>`<button class="chip ${M.ii===i?'on':''}" data-imii="${i}">${x.n}</button>`).join('')}</div>
+  ${X.m.length?mx(X.n,X.c,X.m,X.d,symRow(X.c)):cx(X.n,X.c,X.d,symRow(X.c))}
+  <div class="tip"><b>Comment les placer</b>${M.ie==='intro'?'Joue l\'intro au tempo du morceau, mais un peu plus doucement. Regarde le chanteur (ou compte « 3, 4 » dans ta tête) sur la dernière mesure, puis enchaîne le premier accord du couplet.':'Ralentis progressivement sur les deux dernières mesures. Garde la pédale sur l\'accord final et laisse-le s\'éteindre complètement avant de lever les mains.'}</div>
+
+  <h2>La bibliothèque de licks</h2>
+  <p class="small">${LICKS2.length} petites phrases de 1 ou 2 mesures, chacune avec son accord. Apprends-en une par semaine, dans 3 tonalités.</p>
+  <div class="chips sm">${Object.entries(LCAT).map(([k,v])=>`<button class="chip ${M.lc===k?'on':''}" data-imlc="${k}">${v}</button>`).join('')}</div>
+  <div class="g2">${L.map(l=>mx(l.n,l.ctx,l.m,l.w,`<div class="rinfo"><p><span class="lbl">🎯 Quand :</span> ${l.u}</p><p><span class="lbl">✋ Doigté :</span> ${l.f}</p></div>`,84)).join('')}</div>`;}
+
+/* ============ PAGE : ACCOMPAGNER UNE VOIX ============ */
+S.vo={i:0,feel:'pop',ok:[],from:0,to:0};
+const VSTEPS=[
+ {ic:'🎤',t:'Le rôle de l\'accompagnateur',kid:'Le chanteur est la star, toi tu es son tapis volant : tu le portes, tu ne passes pas devant lui.',adult:'Accompagner, c\'est soutenir sans couvrir : donner la tonalité, la pulsation et l\'harmonie, en laissant la place à la voix. Un bon accompagnateur joue souvent moins de notes qu\'un soliste.',
+  pts:['La voix passe toujours en premier : si on ne l\'entend plus, tu joues trop fort ou trop aigu.','La pulsation doit être stable : le chanteur s\'appuie dessus.','Ton jeu raconte l\'énergie du morceau : calme au couplet, plein au refrain.']},
+ {ic:'🏠',t:'Trouver la tonalité',kid:'Chante la chanson et arrête-toi sur la note où « on est rentré à la maison » : c\'est la tonique !',adult:'Repère la note de repos de la mélodie (souvent la dernière note du refrain) et cherche-la au piano : c\'est la tonique. Puis teste l\'accord majeur et mineur sur cette note : celui qui « colle » donne la tonalité.',
+  pts:['Chante la fin du refrain et tiens la dernière note.','Cherche cette note au piano (en montant ou descendant jusqu\'à ce que ça sonne pareil).','Joue l\'accord majeur puis mineur dessus : lequel sonne juste ?'],tool:'drone'},
+ {ic:'↕️',t:'Adapter à la voix du chanteur',kid:'Si le chanteur crie dans les aigus ou grogne dans les graves, on déplace toute la chanson plus haut ou plus bas : c\'est transposer.',adult:'Chaque voix a sa tessiture. Si la note la plus haute est trop difficile, descends la tonalité d\'un ou deux tons ; si la plus basse est inaudible, monte-la. On transpose toute la grille, pas seulement un accord.',
+  pts:['Demande au chanteur de chanter le passage le plus aigu.','Trop tendu ? Descends d\'un ton (2 demi-tons) et réessaie.','Les accords changent de nom, mais les degrés restent les mêmes : pense I – V – vi – IV.'],tool:'transpose'},
+ {ic:'4️⃣',t:'Les 4 accords qui suffisent',kid:'Avec 4 accords, tu peux accompagner des centaines de chansons. Ce sont les numéros 1, 4, 5 et 6.',adult:'I, IV, V et vi couvrent l\'essentiel de la pop. Apprends-les dans les tonalités courantes (Do, Sol, Ré, La, Fa, Si♭) : tu pourras accompagner presque tout au premier essai.',
+  pts:['I – V – vi – IV : la grille la plus courante.','vi – IV – I – V : la même, qui commence en mineur.','I – IV – V : le rock, le blues, la chanson traditionnelle.'],ex:[['C',4],['G',4],['Am',4],['F',4]]},
+ {ic:'👂',t:'Trouver les accords à l\'oreille',kid:'Écoute d\'abord la note la plus grave (la basse). Ensuite, demande-toi : joyeux ou triste ?',adult:'Méthode en 3 temps : 1) trouve la basse, 2) décide majeur ou mineur, 3) traduis en degré. Les changements d\'accord tombent presque toujours sur le temps 1 de la mesure (parfois le 3).',
+  pts:['Commence par jouer seulement la basse de chaque accord.','Majeur (lumineux) ou mineur (sombre) ?','Si rien ne colle, essaie les accords de la tonalité dans l\'ordre I, V, vi, IV, ii.'],link:['train','S\'entraîner aux accords à l\'oreille']},
+ {ic:'🗺️',t:'La structure de la chanson',kid:'Une chanson, c\'est comme une maison avec des pièces : l\'entrée (intro), le salon (couplet), la grande salle (refrain)…',adult:'Repère la forme : intro, couplet, pré-refrain, refrain, pont, outro. Note la grille de chaque partie sur une feuille : c\'est ta carte.',
+  pts:['Écris une ligne par section : « Couplet : C G Am F ».','Note les répétitions (×2) et les « stops ».','Repère les mots du chanteur où l\'on change de section.'],link:['songs','Saisir la grille dans Morceaux']},
+ {ic:'🥁',t:'Choisir le rythme',kid:'Une chanson calme ? Notes longues et douces. Une chanson qui bouge ? Accords qui rebondissent.',adult:'Le motif de main droite et de main gauche fixe le style. Écoute la batterie ou la guitare de l\'original et imite leur rythme. Ci-dessous : la même grille dans 6 styles.',
+  pts:['Ballade : arpèges lents, pédale.','Pop : croches régulières, basse sur 1 et 3.','Valse (3 temps) : basse – accord – accord.','Swing, bossa, soul : voir les exemples.'],tool:'feels'},
+ {ic:'🌬️',t:'Laisser de la place à la voix',kid:'Ne joue pas les mêmes notes que le chanteur, et reste un peu plus bas que lui.',adult:'Garde la main droite sous la mélodie (autour de Do4-Do5), ne double pas la mélodie note à note, et allège quand la voix est dans le même registre. Les silences du chanteur sont pour toi : petits fills.',
+  pts:['Main droite sous le Do5 la plupart du temps.','Pas de mélodie qui se superpose à la voix : réponds-lui dans ses silences.','Moins de notes au couplet, plus au refrain.']},
+ {ic:'📈',t:'Construire l\'énergie',kid:'Couplet : on chuchote. Refrain : on chante fort ! Le piano fait pareil.',adult:'Varie la densité : couplet en arpèges ou accords tenus, pré-refrain qui monte (basse en croches, crescendo), refrain plein (octaves à gauche, accords sur toutes les croches), pont différent (autre registre, autre rythme).',
+  pts:['Couplet : p, arpèges, registre médium.','Pré-refrain : crescendo, rythme qui se densifie.','Refrain : f, octaves à gauche, accords plus larges.','Pont : surprise (autre rythme, ou seulement la main gauche).'],tool:'energy'},
+ {ic:'🎬',t:'Intro et fin',kid:'Avant que le chanteur commence, tu joues une petite entrée ; à la fin, tu fermes la porte doucement.',adult:'Intro : 2 à 4 mesures (souvent la grille du refrain ou du couplet) pour donner la tonalité et le tempo au chanteur. Fin : ralentir, ou répéter la dernière phrase (tag), puis l\'accord de tonique tenu.',
+  pts:['Intro classique : les 4 derniers accords du refrain.','Donne la note de départ du chanteur dans la dernière mesure de l\'intro.','Fin : voir les « Fins stylées » de la page Improviser.'],link:['impro','Débuts et fins stylés']},
+ {ic:'👀',t:'Suivre le chanteur',kid:'Regarde le chanteur : s\'il ralentit, tu ralentis ; s\'il respire, tu attends.',adult:'L\'accompagnateur suit, il ne dirige pas. Écoute les respirations, attends la reprise après un point d\'orgue, accompagne les ralentis. Convenez de signes (un regard pour la fin, une main levée pour un arrêt).',
+  pts:['Garde un œil sur le chanteur aux fins de phrases.','Sur un point d\'orgue, tiens l\'accord jusqu\'à ce qu\'il reprenne.','Si le chanteur saute une mesure, saute avec lui : la musique continue.']},
+ {ic:'🛟',t:'Si tu te perds',kid:'Pas de panique : continue à jouer seulement la note grave en gardant le rythme, et retrouve le refrain.',adult:'Ne t\'arrête jamais. Réduis à la basse seule (ou à des accords tenus) en gardant la pulsation, écoute la voix pour retrouver la section, et repars au début de la prochaine phrase ou au refrain.',
+  pts:['Garde la pulsation, même avec une seule note.','Écoute les mots : ils disent où on en est.','Rentre sur le temps 1 d\'une nouvelle section.']},
+ {ic:'✅',t:'Ta routine et ta checklist',kid:'Avant de jouer avec quelqu\'un, vérifie la liste : tu es prêt !',adult:'La préparation fait la moitié du travail. Pour chaque chanson : grille notée, tonalité validée avec le chanteur, intro et fin prévues, passages difficiles travaillés lentement.',
+  pts:['Grille notée et vérifiée à l\'oreille.','Tonalité essayée avec le chanteur.','Intro, fin et énergie de chaque section décidées.','Une répétition complète sans s\'arrêter, même avec des erreurs.']}];
+const VKN=()=>['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'].map(x=>nm(parse(x)));
+function waltzSteps(syms){return symVoices(syms).flatMap((v,i)=>{const sh={lh:[v.b],rh:v.rh};return[{lh:[v.b],d:1,sus:2.8,label:symLabel(syms[i]),show:sh},{rh:v.rh,d:1,sus:.8,vel:.7,show:sh},{rh:v.rh,d:1,sus:.8,vel:.7,show:sh}];});}
+const FEELS=[['ballade','Ballade','nocturne'],['pop','Pop','pop'],['valse','Valse 3 temps','waltz'],['swing','Swing','stride'],['bossa','Bossa','bossa'],['soul','Soul','neosoul']];
+function renderVoice(){const V=S.vo,st=VSTEPS[V.i],gr=['C','G','Am','F'];
+  let tool='';
+  if(st.tool==='drone')tool=`<div class="card"><h3>🧪 Outil : la note de repos</h3><p class="small">Chante la fin de la chanson pendant que tu joues ces notes : celle qui « sonne comme la maison » est la tonique.</p>
+   <div class="chips">${[0,1,2,3,4,5,6,7,8,9,10,11].map(p=>`<button class="chip" data-vodrone="${p}">${nm(parse((gFlat()?FLAT:SHARP)[p]))}</button>`).join('')}</div>
+   <p class="small">Puis compare l'accord majeur et mineur sur cette note :</p><div class="row"><button class="btn alt" data-vochord="maj">▶ Majeur</button><button class="btn alt" data-vochord="min">▶ Mineur</button></div></div>`;
+  if(st.tool==='transpose'){const from=V.from,to=V.to,sh=mod(to-from),fl=[1,3,5,8,10].includes(to),N=p=>nm(parse((fl?FLAT:SHARP)[mod(p)])),deg=[[0,''],[7,''],[9,'m'],[5,'']];
+   tool=`<div class="card"><h3>🧪 Outil : transposer une grille</h3><div class="row"><span class="small">Tonalité d'origine</span><select id="vofrom">${VKN().map((n,i)=>`<option value="${i}" ${i===from?'selected':''}>${n}</option>`).join('')}</select>
+    <span class="small">Tonalité pour la voix</span><select id="voto">${VKN().map((n,i)=>`<option value="${i}" ${i===to?'selected':''}>${n}</option>`).join('')}</select></div>
+    <p>${sh?`On ${sh<=6?'monte':'descend'} de <b>${sh<=6?sh:12-sh} demi-ton${(sh<=6?sh:12-sh)>1?'s':''}</b>.`:'Même tonalité.'}</p>
+    <table class="t"><tr><td class="small">Degré</td>${['I','V','vi','IV'].map(x=>`<td><b>${x}</b></td>`).join('')}</tr><tr><td class="small">Origine</td>${deg.map(([i,q])=>`<td>${N(from+i)}${q}</td>`).join('')}</tr><tr><td class="small">Voix</td>${deg.map(([i,q])=>`<td><b>${N(to+i)}${q}</b></td>`).join('')}</tr></table>
+    <p class="small">Dans Morceaux, les boutons ± de transposition font ce calcul sur toute la grille.</p></div>`;}
+  if(st.tool==='feels'){const f=FEELS.find(x=>x[0]===V.feel)||FEELS[1],steps=f[2]==='waltz'?waltzSteps(gr):patSteps(gr,f[2],4);
+   tool=`<div class="card"><h3>🧪 La même grille, six styles</h3><div class="chips">${FEELS.map(([k,n])=>`<button class="chip ${V.feel===k?'on':''}" data-vofeel="${k}">${n}</button>`).join('')}</div></div>${exCard({title:f[1]+' · I – V – vi – IV',bpm:f[0]==='ballade'?66:f[0]==='swing'?120:96,steps,base:patSteps(gr,'block',f[2]==='waltz'?3:4)})}`;}
+  if(st.tool==='energy')tool=`<div class="g2">${cx('Couplet : léger',[['C',4],['G',4],['Am',4],['F',4]],'Arpèges doux, médium.','', 'nocturne')}${cx('Refrain : plein',[['C',4],['G',4],['Am',4],['F',4]],'Octaves à gauche, accords sur les croches.','','pop')}</div>`;
+  const done=V.ok.includes(V.i);
+  return`<section class="hero"><div class="pix">de A à Z</div><h1>Accompagner<br><span class="p">une voix</span></h1>
+  <p class="lead">${isKid()?'Tu veux jouer pendant que quelqu\'un chante ? Voici le chemin complet, étape par étape, pour devenir le meilleur partenaire de ton chanteur.':'Le guide complet de l\'accompagnement : trouver la tonalité, l\'adapter à la voix, relever les accords, choisir le rythme, construire l\'énergie et suivre le chanteur. Treize étapes, avec des outils pour pratiquer.'}</p></section>
+  ${pedBar()}
+  <div class="mmap">${VSTEPS.map((x,k)=>`<button class="mdot ${k===V.i?'cur':''} ${V.ok.includes(k)?'done':''}" data-voi="${k}"><span>${V.ok.includes(k)?'✓':x.ic}</span><small>${String.fromCharCode(65+k)}</small></button>`).join('')}</div>
+  <div class="card mission"><div class="mhead"><span class="micon">${st.ic}</span><div><span class="small">Étape ${String.fromCharCode(65+V.i)} · ${V.i+1}/${VSTEPS.length}</span><h3>${st.t}</h3></div></div>
+   <p style="margin-top:10px">${isKid()?st.kid:st.adult}</p>
+   <div class="vform"><b>À faire</b><ul class="clean">${st.pts.map(p=>`<li>${p}</li>`).join('')}</ul></div>
+   ${st.ex?symRow(st.ex)+cx('Écoute',st.ex,'','','pop'):''}
+   ${st.link?`<button class="chip" data-tab="${st.link[0]}">${st.link[1]} →</button>`:''}</div>
+  ${tool}
+  <div class="row" style="justify-content:space-between">${V.i>0?`<button class="btn alt" data-voi="${V.i-1}">← Précédente</button>`:'<span></span>'}
+   ${done?(V.i<VSTEPS.length-1?`<button class="btn" data-voi="${V.i+1}">Étape suivante →</button>`:'<span class="small">Parcours terminé 🎉</span>'):`<button class="btn" data-act="voDone">J'ai compris (+10 XP)</button>`}</div>`;}
+
+/* ============ PAGE : COURS D'HARMONIE ============ */
+S.hm={i:0,pick:null};
+const HARM=[
+ {ic:'📏',t:'Les intervalles',kid:'Un intervalle, c\'est la distance entre deux notes, comme le nombre de marches entre deux étages.',adult:'L\'intervalle mesure l\'écart entre deux notes, en demi-tons. Son nom (tierce, quinte…) compte les noms de notes ; sa qualité (majeure, mineure, juste) précise le nombre exact de demi-tons.',
+  pts:['Seconde majeure = 2 demi-tons · tierce mineure = 3 · tierce majeure = 4.','Quarte juste = 5 · triton = 6 · quinte juste = 7.','Sixte majeure = 9 · septième mineure = 10 · septième majeure = 11 · octave = 12.'],
+  ex:()=>exCard({title:'Do vers chaque intervalle',bpm:70,steps:[[62,'2de'],[63,'3ce m'],[64,'3ce M'],[65,'4te'],[66,'triton'],[67,'5te'],[69,'6te'],[70,'7e m'],[71,'7e M'],[72,'octave']].flatMap(([m,l])=>[{rh:[60],d:.5,label:l},{rh:[m],d:.5},{rh:[60,m],d:1}])}),
+  q:{q:'Combien de demi-tons dans une quinte juste ?',o:['5','7','9'],a:1,e:'Do – Sol : 7 demi-tons.'},r:'Compte les demi-tons : 3 et 4 font les tierces, 7 la quinte.'},
+ {ic:'🧱',t:'Construire les accords',kid:'Un accord, c\'est 3 notes empilées en sautant une touche blanche à chaque fois.',adult:'Une triade empile deux tierces : majeure (4 + 3), mineure (3 + 4), diminuée (3 + 3), augmentée (4 + 4). Ajouter une tierce de plus donne un accord de septième.',
+  pts:['Majeur : 1 – 3 – 5 (C = Do Mi Sol).','Mineur : 1 – ♭3 – 5 (Cm = Do Mi♭ Sol).','7e : maj7 (7e majeure), 7 (dominante), m7, m7♭5 (demi-diminué), °7.'],ex:()=>cx('Les 4 triades, puis les 4 septièmes',['C','Cm','Cdim','Caug','Cmaj7','C7','Cm7','Cm7b5']),
+  q:{q:'Un accord mineur, c\'est…',o:['4 puis 3 demi-tons','3 puis 4 demi-tons','3 puis 3 demi-tons'],a:1,e:'Tierce mineure (3) puis tierce majeure (4).'},r:'Majeur 4+3, mineur 3+4, diminué 3+3, augmenté 4+4.'},
+ {ic:'🪜',t:'La gamme et la tonalité',kid:'Une gamme, c\'est une famille de 7 notes. La tonalité, c\'est la famille utilisée par la chanson.',adult:'La gamme majeure suit la formule T T ½ T T T ½. La tonalité, c\'est l\'ensemble des notes et des accords organisés autour d\'une tonique ; l\'armure en indique les altérations.',
+  pts:['Formule majeure : ton, ton, ½, ton, ton, ton, ½.','Mineure naturelle : ton, ½, ton, ton, ½, ton, ton.','Relative : même armure (Do majeur / La mineur).'],ex:()=>exCard({title:'La gamme de Do majeur',bpm:90,steps:[60,62,64,65,67,69,71,72].map(m=>({rh:[m],d:.5}))}),
+  q:{q:'La relative mineure de Do majeur est…',o:['Do mineur','La mineur','Mi mineur'],a:1,e:'Même armure (aucune altération), tonique La.'},r:'T T ½ T T T ½ : la recette de toutes les gammes majeures.'},
+ {ic:'🔢',t:'Les degrés et leurs accords',kid:'Chaque note de la gamme a un numéro. Sur chaque numéro, on fabrique un accord : certains sont joyeux, d\'autres tristes.',adult:'En empilant des tierces de la gamme sur chaque degré, on obtient : I, ii, iii, IV, V, vi, vii°. En 7e : Imaj7, ii7, iii7, IVmaj7, V7, vi7, viiø7.',
+  pts:['Majeurs : I, IV, V · mineurs : ii, iii, vi · diminué : vii°.','Avec la 7e, seul le V est un accord « 7 » (dominante).','MAJUSCULE = majeur, minuscule = mineur.'],ex:()=>cx('Les 7 accords de Do',['C','Dm','Em','F','G','Am','Bdim','C'],'','','block'),link:['deg','La page Degrés en détail'],
+  q:{q:'Le vi en Do majeur est…',o:['A','Am','Adim'],a:1,e:'La 6e note est La, et l\'accord est mineur.'},r:'M m m M M m dim.'},
+ {ic:'🏡',t:'Les fonctions : maison, départ, retour',kid:'Certains accords sont la maison (on s\'y repose), d\'autres sont le départ, d\'autres le chemin du retour.',adult:'Trois fonctions organisent la tonalité : tonique (I, vi, iii : repos), sous-dominante (IV, ii : éloignement), dominante (V, vii° : tension qui veut revenir). Une progression est un voyage entre ces fonctions.',
+  pts:['Tonique : I (et ses remplaçants vi, iii).','Sous-dominante : IV, ii.','Dominante : V, V7, vii°. Le triton du V7 veut se résoudre.'],ex:()=>cx('T – SD – D – T',['C','F','G7','C']),
+  q:{q:'Quel accord crée le plus de tension ?',o:['IV','V7','vi'],a:1,e:'V7 contient le triton (Si – Fa) qui se résout sur Do – Mi.'},r:'Repos → départ → tension → retour.'},
+ {ic:'🔚',t:'Les cadences',kid:'Une cadence, c\'est la ponctuation de la musique : un point, une virgule, un point d\'interrogation.',adult:'Les cadences terminent les phrases : parfaite (V – I, le point final), plagale (IV – I, l\'« amen »), demi-cadence (… – V, la virgule), rompue (V – vi, la surprise).',
+  pts:['Parfaite V – I : conclusion.','Plagale IV – I : conclusion douce.','Demi-cadence sur V : suspens.','Rompue V – vi : on évite la fin.'],ex:()=>exCard({title:'Parfaite · plagale · demi · rompue',bpm:80,steps:[...patSteps(['G7','C'],'block',2),...patSteps(['F','C'],'block',2),...patSteps(['C','G'],'block',2),...patSteps(['G7','Am'],'block',2)]}),
+  q:{q:'V – vi s\'appelle une cadence…',o:['plagale','rompue','parfaite'],a:1,e:'On attend I et on tombe sur vi : rompue (ou évitée).'},r:'Parfaite = point, demi = virgule, rompue = surprise.'},
+ {ic:'🔄',t:'Renversements et basse (tierce à la basse)',kid:'On peut jouer la même famille de notes avec une autre note en bas : ça fait une jolie ligne de basse.',adult:'Un accord renversé place la tierce (1er renversement, C/E) ou la quinte (2e, C/G) à la basse. La notation « slash » X/Y indique la basse. Utilisé pour créer des basses conjointes.',
+  pts:['C/E : 1er renversement (tierce à la basse).','C/G : 2e renversement (quinte à la basse), souvent avant V.','X/Y avec Y étranger à l\'accord : couleur (F/G, D/C).'],ex:()=>cx('Une basse qui descend',['C','G/B','Am','C/G','F','C/E','Dm7','G7']),
+  q:{q:'C/E veut dire…',o:['Do majeur avec Mi à la basse','Do puis Mi','Do mineur'],a:0,e:'L\'accord de Do, mais la note la plus grave est Mi.'},r:'La lettre après la barre = la basse.'},
+ {ic:'🧵',t:'La conduite des voix',kid:'Entre deux accords, chaque doigt fait le plus petit pas possible : comme une danse bien réglée.',adult:'Chaque note d\'un accord est une « voix ». On garde les notes communes, on bouge les autres par degrés conjoints, et on évite les quintes et octaves parallèles dans l\'écriture classique.',
+  pts:['Notes communes tenues.','Mouvements les plus petits possibles.','La sensible monte vers la tonique, la 7e descend.'],link:['voicing','La page Voicing'],ex:()=>exCard({title:'I – IV – V7 – I lié',bpm:70,steps:[{lh:[48],rh:[60,64,67],d:2,label:'C'},{lh:[41],rh:[60,65,69],d:2,label:'F'},{lh:[43],rh:[59,65,67],d:2,label:'G7'},{lh:[48],rh:[60,64,67],d:2,label:'C'}]}),
+  q:{q:'Dans G7 → C, la note Fa (7e) va vers…',o:['Mi (descend)','Sol (monte)','Fa (reste)'],a:0,e:'La 7e se résout en descendant d\'un degré.'},r:'Sensible monte, 7e descend, notes communes restent.'},
+ {ic:'🧲',t:'Les dominantes secondaires',kid:'On peut fabriquer un « accord aimant » devant n\'importe quel accord pour qu\'il soit encore plus attirant.',adult:'Une dominante secondaire est le V7 d\'un degré autre que I : V7/ii (A7 → Dm), V7/vi (E7 → Am), V7/V (D7 → G). Elle introduit une note hors tonalité (la sensible du degré visé).',
+  pts:['V7/V = D7 en Do (Fa♯ → Sol).','V7/vi = E7 (Sol♯ → La).','V7/ii = A7 (Do♯ → Ré).','On peut les enchaîner : E7 – A7 – D7 – G7 – C.'],ex:()=>cx('Les dominantes en cascade',[['C',4],['E7',2],['A7',2],['D7',2],['G7',2],['C',4]]),
+  q:{q:'Quelle est la dominante secondaire de Am en Do ?',o:['E7','G7','D7'],a:0,e:'Le V de La est Mi : E7.'},r:'V7/X = l\'accord 7 situé une quinte au-dessus de X.'},
+ {ic:'🌗',t:'Les emprunts (mélange des modes)',kid:'On peut prendre un accord à la famille mineure pour colorer une chanson majeure.',adult:'L\'échange modal emprunte des accords à la tonalité parallèle (même tonique, autre mode) : iv, ♭VI, ♭VII, ♭III en majeur. Ils apportent couleur et émotion sans changer de tonique.',
+  pts:['iv (Fm en Do) : la mélancolie.','♭VI – ♭VII – I : la victoire.','♭III (E♭) : la couleur rock.'],ex:()=>cx('Emprunts en Do',[['C',2],['Fm',2],['Ab',2],['Bb',2],['C',4]]),
+  q:{q:'En Do majeur, Fm est…',o:['un emprunt au mineur','une dominante','une erreur'],a:0,e:'Fm vient de Do mineur : c\'est le iv emprunté.'},r:'Même tonique, accords du mode voisin.'},
+ {ic:'🔀',t:'Substitutions',kid:'On peut remplacer un accord par un cousin qui a presque les mêmes notes.',adult:'Deux accords qui partagent leurs notes principales peuvent s\'échanger : relatif (I ↔ vi, IV ↔ ii), tritonique (V7 ↔ ♭II7), diminué (V7 ↔ vii°7).',
+  pts:['I ↔ vi, IV ↔ ii, V ↔ vii° (même fonction).','Tritonique : G7 → D♭7 (mêmes notes Si/Fa).','Le substitut crée une nouvelle ligne de basse.'],ex:()=>cx('ii – V – I, puis ii – ♭II7 – I',[['Dm7',2],['G7',2],['Cmaj7',4],['Dm7',2],['Db7',2],['Cmaj7',4]]),
+  q:{q:'Le substitut tritonique de G7 est…',o:['Db7','C#m7','D7'],a:0,e:'D♭ est à un triton de Sol ; D♭7 et G7 partagent Fa et Si (Do♭).'},r:'Même fonction, autre couleur.'},
+ {ic:'🌉',t:'Les accords de passage',kid:'Entre deux accords, on peut glisser un tout petit accord rapide, comme un pont.',adult:'Les accords de passage relient deux accords principaux : diminués chromatiques (C – C♯°7 – Dm), approches chromatiques (un demi-ton au-dessus ou en dessous), ii–V insérés.',
+  pts:['Diminué un demi-ton au-dessus du premier accord.','Approche chromatique par le dessus : D♭7 → C.','Basse chromatique : Do – Do♯ – Ré.'],ex:()=>cx('Diminués de passage',[['C',2],['C#dim7',2],['Dm7',2],['D#dim7',2],['C/E',4]]),
+  q:{q:'Entre C et Dm7, quel diminué de passage ?',o:['C#dim7','Bdim7','Ebdim7'],a:0,e:'La basse monte Do – Do♯ – Ré.'},r:'Un petit pont chromatique entre deux accords.'},
+ {ic:'🧭',t:'La modulation',kid:'Moduler, c\'est déménager dans une autre maison au milieu de la chanson.',adult:'Moduler, c\'est changer de tonique. Par accord pivot (un accord commun aux deux tonalités), par dominante (V7 de la nouvelle tonalité), ou directement (le « coup de camion » d\'un ton vers le haut pour le dernier refrain).',
+  pts:['Pivot : Am est vi en Do et ii en Sol.','Par dominante : D7 amène Sol.','Directe : refrain final un ton plus haut.'],link:['keys','Les modulations de chaque tonalité'],ex:()=>cx('De Do vers Sol par pivot',[['C',2],['Am',2],['D7',2],['G',4]]),
+  q:{q:'Pour aller de Do à Sol, la dominante à jouer est…',o:['D7','G7','C7'],a:0,e:'Le V7 de Sol est D7.'},r:'Pivot, dominante ou saut direct.'},
+ {ic:'🌶️',t:'Extensions et tensions',kid:'Au-dessus de l\'accord, on peut ajouter des notes « épices » : 9, 11, 13.',adult:'Les extensions prolongent l\'empilement de tierces : 9 (= 2), 11 (= 4), 13 (= 6). Sur les dominantes, on peut les altérer (♭9, ♯9, ♯11, ♭13) pour plus de tension.',
+  pts:['maj9, m9, 13 : couleurs douces.','Évite la 11 juste sur un accord majeur (frotte avec la tierce) : préfère ♯11.','Sur V7 : ♭9 et ♭13 vers un accord mineur.'],link:['ext','La page 9 · 11 · 13'],ex:()=>cx('De la triade à la 13e',[['C',2],['Cmaj7',2],['Cmaj9',2],['G13',2],['G7b9',2],['Cmaj9',4]]),
+  q:{q:'La 9e d\'un accord de Do est…',o:['Ré','Fa','La'],a:0,e:'9 = 2 une octave plus haut : Ré.'},r:'9 = 2, 11 = 4, 13 = 6.'},
+ {ic:'🔍',t:'Analyser un morceau',kid:'Maintenant tu sais tout : tu peux lire une grille et dire ce que fait chaque accord !',adult:'Analyser : trouver la tonalité, numéroter les accords, repérer les fonctions, les dominantes secondaires, les emprunts et les cadences. Exemple : la grille de September (La majeur).',
+  pts:['Dmaj7 – C♯m7 – Bm7 – C♯m7 | F♯m7 – A : IVmaj7 – iii7 – ii7 – iii7 | vi7 – I.','C♯7 : V7/vi (prépare F♯m7).','Gmaj9/A : ♭VII sur basse de tonique, un « sus » funk.','Refrain Bm9 – E13 – C♯m7 – F♯m7 : ii – V – iii – vi.'],link:['songs','Analyser un morceau dans Maîtriser'],ex:()=>cx('September, analysé (en Do pour comparer)',[['Fmaj7',1],['Em7',1],['Dm7',1],['Em7',1],['Am7',2],['C',2],['Dm9',2],['G13',2],['Em7',2],['Am7',2]]),
+  q:{q:'Dans une grille en La, C♯7 qui va vers F♯m7 est…',o:['une dominante secondaire (V7/vi)','un emprunt','la tonique'],a:0,e:'C♯7 est le V7 de F♯m (vi).'},r:'Tonalité → degrés → fonctions → couleurs.'}];
+function renderHarm(){const H=S.hm,C=HARM[H.i],pk=H.pick,ok=pk===C.q.a,done=(S.ped.harm||[]).includes(H.i);
+  return`<section class="hero"><div class="pix">le cours complet</div><h1>L'<span class="p">harmonie</span></h1>
+  <p class="lead">${isKid()?'L\'harmonie, c\'est l\'art d\'assembler les notes ensemble. Quinze chapitres, du plus simple au plus avancé, pour tout comprendre.':'Un cours progressif en quinze chapitres : des intervalles à l\'analyse d\'un morceau, en passant par les fonctions, les cadences, les dominantes secondaires, les emprunts, les substitutions et la modulation.'}</p></section>
+  ${pedBar()}
+  <div class="mmap">${HARM.map((x,k)=>`<button class="mdot ${k===H.i?'cur':''} ${(S.ped.harm||[]).includes(k)?'done':''}" data-hmi="${k}"><span>${(S.ped.harm||[]).includes(k)?'✓':x.ic}</span><small>${k+1}</small></button>`).join('')}</div>
+  <div class="card mission"><div class="mhead"><span class="micon">${C.ic}</span><div><span class="small">Chapitre ${H.i+1} sur ${HARM.length}${done?' · terminé ✓':''}</span><h3>${C.t}</h3></div></div>
+   <div class="mstep"><span class="mnum">1</span><div><b>Comprendre</b><p>${isKid()?C.kid:C.adult}</p></div></div>
+   <div class="mstep"><span class="mnum">2</span><div><b>L'essentiel</b><ul class="clean">${C.pts.map(p=>`<li>${p}</li>`).join('')}</ul>${C.link?`<button class="chip" data-tab="${C.link[0]}">${C.link[1]} →</button>`:''}</div></div>
+   <div class="mstep"><span class="mnum">3</span><div><b>Écouter</b></div></div>${C.ex()}
+   <div class="mstep"><span class="mnum">4</span><div><b>Vérifier</b><p class="qtext" style="margin:6px 0">${C.q.q}</p>
+    <div class="opts">${C.q.o.map((o,k)=>`<button class="opt ${pk!==null?(k===C.q.a?'good':k===pk?'bad':''):''}" data-hmpick="${k}" ${pk!==null?'disabled':''}>${o}</button>`).join('')}</div>
+    ${pk!==null?`<div class="fb ${ok?'ok':'ko'}"><b>${ok?PRAISE():OOPS()}</b> ${C.q.e}</div>${!ok?`<button class="chip" data-act="hmRetry">Réessayer</button>`:''}`:''}</div></div>
+   <div class="mrecap">✅ <b>Je retiens :</b> ${C.r}</div>
+   <div class="row" style="justify-content:space-between">${H.i>0?`<button class="btn alt" data-hmi="${H.i-1}">← Précédent</button>`:'<span></span>'}
+    ${done?(H.i<HARM.length-1?`<button class="btn" data-hmi="${H.i+1}">Chapitre suivant →</button>`:'<span class="small">Cours terminé 🎉</span>'):`<button class="btn" data-act="hmDone" ${ok?'':'disabled'}>Chapitre terminé (+20 XP)</button>`}</div></div>`;}
+
+
+/* ============ NOUVEAUX GENRES : ANIME, DESSIN ANIMÉ, JEUX VIDÉO ============ */
+GENRES.push(['anime','Anime'],['cartoon','Dessin animé'],['game','Jeux vidéo']);
+Object.assign(KEYT,{
+ anime:{est:1,why:"Les génériques d'anime suivent la J-pop : pas de tonalité reine, des arrangements de guitares (tonalités à dièses) et de cuivres ou cordes (tonalités à bémols). Signature du genre : le dernier refrain monte souvent d'un ton. Classement indicatif.",
+  S:['C','D','E','A'],A:['G','F','Eb','Ab','Am','F#m','C#m','Em'],B:['Bb','B','Db','Bm','Dm','Gm','Cm'],C:['Gb','Fm','Bbm','G#m'],D:['F#','Ebm']},
+ cartoon:{est:1,why:"Héritée de Broadway et de l'orchestre de studio, la musique de dessin animé aime les tonalités des cuivres et des voix d'enfants : Do, Fa, Si♭, Mi♭. Le mineur sert aux méchants. Classement indicatif.",
+  S:['C','F','Bb','G'],A:['Eb','D','Ab','A','Am','Dm','Cm'],B:['E','Db','Gm','Em','Fm'],C:['B','Gb','Bm','F#m','C#m'],D:['F#','Ebm','Bbm','G#m']},
+ game:{est:1,why:"Les premières consoles favorisaient les tonalités simples (Do, La mineur) ; les bandes-son orchestrales d'aujourd'hui aiment Ré mineur et Do mineur pour l'aventure, Do et Fa pour les thèmes joyeux. Mais chaque compositeur a ses habitudes : classement indicatif.",
+  S:['C','Am','Dm','Cm'],A:['F','G','D','Eb','Em','Gm','Fm'],B:['Bb','A','Ab','Db','Bm','Ebm','Bbm'],C:['E','B','F#m','C#m'],D:['Gb','F#','G#m']}});
+Object.assign(ARPT,{
+ anime:{S:['montant','b332'],A:['vague','cascade','plaque'],B:['harpe','pluie','tremolo'],C:['echo','croise'],D:['alberti','habanera'],why:'Ballades en arpèges montants, génériques rock en accords plaqués et boucles 3-3-2 ; les cascades pour les montées vers le refrain.'},
+ cartoon:{S:['plaque','alberti'],A:['pluie','croise','harpe'],B:['montant','vague','tremolo'],C:['b332','habanera'],D:['cascade','echo'],why:'L\'« oom-pah » plaqué et la basse d\'Alberti pour le côté joueur, les pluies et la harpe pour la magie.'},
+ game:{S:['montant','pluie','echo'],A:['vague','harpe','cascade'],B:['b332','plaque','tremolo'],C:['alberti','croise'],D:['habanera'],why:'Les arpèges rapides viennent des puces sonores des vieilles consoles, qui ne pouvaient jouer que quelques notes à la fois. L\'écho et la pluie pour les ambiances.'}});
+Object.assign(PROGT,{
+ anime:{n:'Anime',pat:'pop',S:[['IV – V – iii – vi (Royal Road)',['Fmaj7','G7','Em7','Am'],'La « route royale », omniprésente dans la J-pop et les génériques'],['vi – IV – V – I',['Am','F','G','C'],'Le refrain qui monte vers la lumière']],
+  A:[['IV – V – vi',['F','G','Am','Am'],'Montée émotionnelle sans résolution'],['Basse descendante',['C','G/B','Am','Em/G','F','C/E','Dm','G'],'Ballade, générique de fin'],['Modulation d\'un ton',['G','A7','D','D'],'Le dernier refrain un ton plus haut']],
+  B:[['IVmaj7 – III7 – vi',['Fmaj7','E7','Am','Am'],'La dominante de vi : nostalgie']]},
+ cartoon:{n:'Dessin animé',pat:'stride',S:[['I – VI7 – II7 – V7',['C','A7','D7','G7'],'Le turnaround « ragtime » des cartoons'],['I – IV – I – V',['C','F','C','G'],'La chanson simple à chanter']],
+  A:[['I – II (lydien)',['C','D','C','D'],'Le merveilleux, la magie'],['Ligne chromatique',['C','Caug','C6','C7'],'La quinte qui monte : suspense comique'],['I – iv – I',['C','Fm','C','C'],'Une pointe de tendresse']],
+  B:[['Accords augmentés',['Caug','Daug','Caug','Daug'],'Rêve, transformation magique']]},
+ game:{n:'Jeux vidéo',pat:'ostinato',S:[['♭VI – ♭VII – I',['Ab','Bb','C','C'],'La cadence de victoire, surnommée « cadence Mario »'],['i – ♭VI – ♭VII – i',['Am','F','G','Am'],'Aventure, donjon']],
+  A:[['i – ♭VII – ♭VI – ♭VII',['Am','G','F','G'],'Boucle épique'],['I – V – vi – IV',['C','G','Am','F'],'Thème de menu, joyeux'],['i – iv – V',['Am','Dm','E','Am'],'Combat de boss, mineur harmonique']],
+  B:[['I – ♭III – IV',['C','Eb','F','C'],'Rock de jeu, énergie']]}});
+Object.assign(IGEN,{
+ anime:{min:0,cells:[['IV','V','iii','vi'],['vi','IV','V','I'],['IV','V','vi','vi'],['I','V','vi','IV'],['IV','V','I','vi']],cad:[['IV','V','I','I'],['ii','V','I','I']],
+  rich:{'IV':'IVmaj7','vi':'vi7','V':'Vsus4'},scale:[0,2,4,5,7,9,11],pent:[0,2,4,7,9],rh:[[.5,.5,.5,.5,1,1],[1,.5,.5,2],[.5,.5,1,.5,.5,1]],swing:0,leap:.2,chrom:0},
+ cartoon:{min:0,cells:[['I','vi','ii','V'],['I','IV','I','V'],['I','II7','V','I'],['IV','I','II7','V']],cad:[['ii','V','I','I'],['IV','V','I','I']],
+  rich:{'vi':'vi7','I':'Iadd9'},scale:[0,2,4,5,7,9,11],pent:[0,2,4,7,9],rh:[[.5,.5,1,.5,.5,1],[1,1,1,1],[.5,.5,.5,.5,2]],swing:.6,leap:.25,chrom:.15},
+ game:{min:1,cells:[['i','♭VI','♭VII','i'],['i','♭VII','♭VI','♭VII'],['i','iv m','V/i','i'],['♭VI','♭VII','i','i']],cad:[['♭VI','♭VII','i','i'],['iv m','V/i','i','i']],
+  rich:{'i':'iadd9','♭VI':'♭VImaj7'},scale:[0,2,3,5,7,8,10],pent:[0,3,5,7,10],rh:[[.5,.5,.5,.5,.5,.5,1],[1,1,1,1],[.25,.25,.5,1,1,1]],swing:0,leap:.25,chrom:0}});
+Object.assign(GX,{
+ anime:{era:'1963 → aujourd\'hui',intro:'Les génériques et bandes originales d\'anime : des mélodies très chantantes, une harmonie riche venue de la J-pop et des montées d\'énergie spectaculaires.',
+  dna:{h:'Royal Road (IVmaj7 – V7 – iii7 – vi), accords de 7e et de 9e, modulation d\'un ton au dernier refrain.',r:'Ballades lentes en croches, ou génériques rock très rapides (BPM 150+) avec batterie très présente.',m:'Mélodies amples avec des sauts, notes longues au sommet du refrain.',s:'Contrastes très forts : couplet calme, pré-refrain qui monte, refrain explosif.'},
+  scale:[0,[0,2,4,7,9],'Pentatonique majeure'],styles:[],
+  voicings:[{t:'Royal Road en 7e',d:'Les quatre accords de la « route royale », main droite serrée autour du Do central.',st:[{lh:[41,53],rh:[64,69,72],d:2,label:'Fmaj7'},{lh:[43,55],rh:[65,71,74],d:2,label:'G7'},{lh:[40,52],rh:[62,67,71],d:2,label:'Em7'},{lh:[45,57],rh:[64,69,72],d:2,label:'Am'}]},
+   {t:'Le sus4 qui se résout',d:'L\'attente avant le refrain : la 4te descend sur la tierce.',st:[{lh:[43,55],rh:[60,62,67],d:2,label:'Gsus4'},{lh:[43,55],rh:[59,62,67],d:2,label:'G'}]},
+   {t:'Refrain en octaves',d:'Main gauche en octaves, main droite accord + mélodie doublée : le son « générique ».',st:[{lh:[36,48],rh:[64,67,72,76],d:4,label:'C'}]}],
+  grooves:[{n:'Ballade anime',d:'Arpège en croches, basse sur le 1.',bar:4,bpm:72,ev:[[0,'bo',4],[0,'c0',.5],[.5,'c1',.5],[1,'c2',.5],[1.5,'c1',.5],[2,'c0',.5],[2.5,'c1',.5],[3,'c2',.5],[3.5,'c1',.5]]},
+   {n:'Générique rock',d:'Accords en croches serrées, accents sur 2 et 4.',bar:4,bpm:150,ev:[[0,'bo',4,1.1],[0,'c',.5],[.5,'c',.5,.7],[1,'c',.5,1.1],[1.5,'c',.5,.7],[2,'c',.5],[2.5,'c',.5,.7],[3,'c',.5,1.1],[3.5,'c',.5,.7]]}],
+  licks:[{n:'Le saut du refrain',d:'Une quarte puis une montée vers la note longue : l\'élan d\'un refrain d\'anime.',n2:[[67,.5],[72,.5],[74,.5],[76,1],[74,.5],[72,1]]},{n:'La montée Royal Road',d:'La mélodie monte par degrés sur IV – V, puis se pose sur la tierce.',n2:[[69,.5],[71,.5],[72,.5],[74,.5],[76,1],[74,.5],[72,.5]]}],
+  form:'Version TV de 89 secondes : intro courte – couplet – pré-refrain – refrain. Version complète : + 2e couplet, pont, dernier refrain un ton plus haut.',
+  pit:['Jouer le refrain aussi doucement que le couplet : la montée d\'énergie est l\'essentiel du genre.','Oublier la modulation finale : repère le V7 de la nouvelle tonalité juste avant.','Trop de notes à gauche dans les tempos rapides : garde des octaves simples.'],
+  listen:'Joe Hisaishi, Yoko Kanno, Hiroyuki Sawano, Yuki Kajiura, LiSA, Aimer',songs:['Merry-Go-Round of Life – Joe Hisaishi','Unravel – TK from Ling tosite sigure','Gurenge – LiSA'],
+  recipes:['Le Royal Road des génériques','La modulation du dernier refrain']},
+ cartoon:{era:'1928 → aujourd\'hui',intro:'Des cartoons des années 30 aux grands films d\'animation : une musique qui raconte chaque geste, entre swing, comédie musicale et magie orchestrale.',
+  dna:{h:'Dominantes en cascade (I – VI7 – II7 – V7), accords augmentés et diminués, couleur lydienne pour la magie.',r:'« Oom-pah » (basse – accord), swing, valses, et des changements de tempo brusques pour suivre l\'action.',m:'Gammes chromatiques rapides, mélodies de comédie musicale faciles à chanter.',s:'Très descriptif : chaque effet (chute, course, surprise) a son motif.'},
+  scale:[0,[0,2,4,6,7,9,11],'Lydien (la magie)'],styles:[],
+  voicings:[{t:'Le turnaround ragtime',d:'Chaque accord est la dominante du suivant : la musique « court ».',st:[{lh:[48],rh:[64,67,72],d:1,label:'C'},{lh:[45],rh:[61,64,67],d:1,label:'A7'},{lh:[50],rh:[60,62,66],d:1,label:'D7'},{lh:[43],rh:[59,62,65],d:1,label:'G7'},{lh:[48],rh:[60,64,67],d:2,label:'C'}]},
+   {t:'La quinte qui monte',d:'Do – Do augmenté – Do6 – Do7 : la quinte monte par demi-tons, suspense comique.',st:[{lh:[48],rh:[64,67,72],d:1,label:'C'},{lh:[48],rh:[64,68,72],d:1,label:'C+'},{lh:[48],rh:[64,69,72],d:1,label:'C6'},{lh:[48],rh:[64,70,72],d:1,label:'C7'}]},
+   {t:'La magie lydienne',d:'Ré majeur sur une basse de Do : l\'émerveillement.',st:[{lh:[36,48],rh:[64,67,72],d:2,label:'C'},{lh:[36,48],rh:[62,66,69],d:2,label:'D/C'}]}],
+  grooves:[{n:'Oom-pah',d:'Basse sur 1 et 3, accord sur 2 et 4 : le pas de danse des cartoons.',bar:4,bpm:132,ev:[[0,'b',1,1.1],[1,'c',.5,.8],[2,'b',1],[3,'c',.5,.8]]},
+   {n:'Valse de conte',d:'Boum – tchak – tchak, pour les scènes tendres.',bar:3,bpm:120,ev:[[0,'b',1,1.1],[1,'c',.5,.7],[2,'c',.5,.7]]}],
+  licks:[{n:'La course chromatique',d:'Huit demi-tons qui montent à toute vitesse, puis l\'arrivée.',n2:[[60,.25],[61,.25],[62,.25],[63,.25],[64,.25],[65,.25],[66,.25],[67,.25],[72,2]]},{n:'Le « ta-da ! »',d:'L\'arpège qui monte pour présenter un personnage.',n2:[[67,.5],[72,.5],[76,.5],[79,2.5]]}],
+  form:'Chansons de comédie musicale (couplet – refrain – pont – refrain) et musiques d\'action en petits fragments qui changent toutes les quelques secondes.',
+  pit:['Jouer trop lourd : le style est léger et rebondissant.','Swinguer à moitié : décide si le passage est droit ou swing.','Oublier les silences : en cartoon, la pause avant le gag compte autant que la note.'],
+  listen:'Alan Menken, Michael Giacchino, Randy Newman, Danny Elfman, Carl Stalling',songs:['Married Life – Michael Giacchino','Let It Go – Kristen Anderson-Lopez & Robert Lopez','Le générique des Simpson – Danny Elfman'],
+  recipes:['Le turnaround des cartoons','La magie lydienne']},
+ game:{era:'1978 → aujourd\'hui',intro:'Des bips des premières consoles aux bandes originales symphoniques : des boucles faites pour être écoutées des heures sans lasser.',
+  dna:{h:'Modes (éolien, dorien, lydien), ♭VI – ♭VII – I pour la victoire, mineur harmonique pour les combats.',r:'Boucles régulières, ostinatos, rythmes rapides pour l\'action.',m:'Motifs courts et mémorables (souvent 2 mesures), arpèges rapides hérités des puces sonores.',s:'La musique doit boucler sans couture : la fin ramène au début.'},
+  scale:[0,[0,2,3,5,7,8,10],'Mineur naturel (éolien)'],styles:[],
+  voicings:[{t:'Quintes de puissance',d:'Fondamentale + quinte + octave, sans tierce : le son « héroïque » des jeux d\'action.',st:[{lh:[45,52],rh:[57,64,69],d:2,label:'A5'},{lh:[41,48],rh:[53,60,65],d:2,label:'F5'},{lh:[43,50],rh:[55,62,67],d:2,label:'G5'},{lh:[45,52],rh:[57,64,69],d:2,label:'A5'}]},
+   {t:'La cadence de victoire',d:'♭VI – ♭VII – I : on arrive sur la tonique par deux accords majeurs empruntés.',st:[{lh:[44],rh:[60,63,68],d:2,label:'A♭'},{lh:[46],rh:[62,65,70],d:2,label:'B♭'},{lh:[48],rh:[64,67,72],d:4,label:'C'}]},
+   {t:'L\'arpège rapide',d:'Une note à la fois, très vite, comme les vieilles consoles qui ne pouvaient jouer qu\'un son par canal.',st:[{lh:[45],rh:[69],d:.25,label:'Am'},{lh:[],rh:[72],d:.25,label:'Am'},{lh:[],rh:[76],d:.25,label:'Am'},{lh:[],rh:[81],d:.25,label:'Am'},{lh:[],rh:[76],d:.25,label:'Am'},{lh:[],rh:[72],d:.25,label:'Am'},{lh:[],rh:[69],d:.25,label:'Am'},{lh:[],rh:[72],d:.25,label:'Am'}]}],
+  grooves:[{n:'Arpège 8-bit',d:'Doubles croches sur les notes de l\'accord, basse en croches.',bar:4,bpm:120,ev:[[0,'b',.5],[.5,'b',.5],[1,'b',.5],[1.5,'b',.5],[2,'b',.5],[2.5,'b',.5],[3,'b',.5],[3.5,'b',.5],[0,'c0',.25],[.25,'c1',.25],[.5,'c2',.25],[.75,'c1',.25],[1,'c0',.25],[1.25,'c1',.25],[1.5,'c2',.25],[1.75,'c1',.25],[2,'c0',.25],[2.25,'c1',.25],[2.5,'c2',.25],[2.75,'c1',.25],[3,'c0',.25],[3.25,'c1',.25],[3.5,'c2',.25],[3.75,'c1',.25]]},
+   {n:'Ostinato de donjon',d:'Une basse obstinée et un accord tenu : la tension qui ne s\'arrête pas.',bar:4,bpm:96,ev:[[0,'b',.5,1.1],[.5,'b',.5,.7],[1,'b',.5],[1.5,'b',.5,.7],[2,'b',.5,1.1],[2.5,'b',.5,.7],[3,'b',.5],[3.5,'b',.5,.7],[0,'c',4,.6]]}],
+  licks:[{n:'L\'arpège 8-bit',d:'L\'accord monté puis redescendu en doubles croches.',n2:[[60,.25],[64,.25],[67,.25],[72,.25],[67,.25],[64,.25],[60,.25],[64,.25],[67,2]]},{n:'La fanfare de victoire',d:'Un arpège qui monte, puis ♭VI – ♭VII vers la tonique.',n2:[[72,.5],[76,.5],[79,.5],[84,1],[80,.5],[82,.5],[84,.5]]}],
+  form:'Boucles de 8 à 32 mesures qui se répètent ; intro unique puis boucle (« loop »), petits jingles pour la victoire, la défaite ou un objet trouvé.',
+  pit:['Finir la boucle sur la tonique : en jeu vidéo, la dernière mesure doit ramener au début.','Jouer les arpèges trop fort : ils sont un tapis, la mélodie passe devant.','Négliger la régularité : un tempo stable est indispensable pour les boucles.'],
+  listen:'Koji Kondo, Nobuo Uematsu, Yoko Shimomura, Go Ichinose, Toby Fox, C418',songs:['National Park – Go Ichinose (dans ton répertoire)','Zelda\'s Lullaby – Koji Kondo','Sweden – C418'],
+  recipes:['La cadence de victoire','La boucle de donjon']}});
+Object.assign(GREP,{
+ anime:[{t:'Étude « Royal Road »',a:'exercice dans le style des génériques',l:2,k:'C',w:'IVmaj7 – V7 – iii7 – vi, la progression reine de la J-pop, avec retour sur I.',g:['Fmaj7','G7','Em7','Am','Fmaj7','G7','C','C']},
+  {t:'Merry-Go-Round of Life (Le Château ambulant)',a:'Joe Hisaishi',l:3,k:'',w:'La valse mélancolique : main gauche en « boum – tchak – tchak » et rubato.'},
+  {t:'One Summer\'s Day (Le Voyage de Chihiro)',a:'Joe Hisaishi',l:2,k:'',w:'Une mélodie simple sur des accords posés : le toucher et la patience.'},
+  {t:'Unravel (Tokyo Ghoul)',a:'TK from Ling tosite sigure',l:3,k:'',w:'Les arpèges rapides et les ruptures d\'énergie.'},
+  {t:'Gurenge (Demon Slayer)',a:'LiSA',l:3,k:'',w:'Le rythme rock de la main gauche et les accents.'}],
+ cartoon:[{t:'Étude « ragtime de cartoon »',a:'exercice',l:2,k:'C',w:'I – VI7 – II7 – V7 en « oom-pah » : les dominantes en cascade.',g:['C','A7','D7','G7','C','A7','D7','G7']},
+  {t:'Étude « lydienne »',a:'exercice',l:1,k:'C',w:'I – II : le son du merveilleux.',g:['C','D','C','D','Am','D','F','G']},
+  {t:'Married Life (Là-haut)',a:'Michael Giacchino',l:2,k:'',w:'La valse tendre dont la mélodie change de couleur à chaque retour.'},
+  {t:'Let It Go (La Reine des neiges)',a:'Kristen Anderson-Lopez & Robert Lopez',l:2,k:'',w:'La ballade qui grandit jusqu\'au refrain : la gestion de l\'énergie.'},
+  {t:'Le générique des Simpson',a:'Danny Elfman',l:3,k:'',w:'La gamme lydienne et les rythmes rapides.'}],
+ game:[{t:'National Park (Pokémon Or HeartGold / Argent SoulSilver)',a:'Go Ichinose · arr. Olimar12345',l:3,k:'Db',w:'Déjà dans ton répertoire, note à note : le thème tendre, les triolets, le riff syncopé.'},
+  {t:'Étude « cadence de victoire »',a:'exercice',l:1,k:'C',w:'♭VI – ♭VII – I pour finir en triomphe.',g:['C','F','Ab','Bb','C','F','Ab Bb','C']},
+  {t:'Étude « donjon »',a:'exercice',l:1,k:'Am',w:'i – ♭VI – ♭VII – i en ostinato, puis V pour boucler.',g:['Am','F','G','Am','Am','F','G','E']},
+  {t:'Zelda\'s Lullaby (The Legend of Zelda)',a:'Koji Kondo',l:2,k:'',w:'Une berceuse en arpèges : legato et pédale.'},
+  {t:'Sweden (Minecraft)',a:'C418',l:1,k:'',w:'Des accords lents et peu de notes : le son et le silence.'},
+  {t:'Prelude (Final Fantasy)',a:'Nobuo Uematsu',l:2,k:'',w:'Des arpèges qui montent et descendent sur tout le clavier.'}]});
+Object.assign(LICKX,{
+ 'Le saut du refrain':['Une quarte vers le haut, une montée, puis une note longue au sommet.','Le saut crée l\'élan, la note longue laisse le temps à l\'émotion.','Les refrains d\'anime et de J-pop.','Place-le au premier temps du refrain, sur l\'accord IV.','Monte-le d\'une octave pour le dernier refrain.'],
+ 'La montée Royal Road':['La mélodie monte par degrés pendant que les accords font IV – V.','La montée et la basse qui monte vont dans le même sens : l\'énergie grandit.','Les pré-refrains de J-pop.','Commence sur la 3ce de IV (La en Do).','Fais-la en croches, puis en noires pour un effet plus large.'],
+ 'La course chromatique':['Une gamme chromatique rapide qui monte, puis un saut vers la note d\'arrivée.','Tous les demi-tons donnent l\'impression d\'une course effrénée.','Les poursuites des cartoons.','Doigté : 1-3 sur les touches blanches et noires alternées, le pouce sur Do et Fa.','Fais-la descendre pour une chute.'],
+ 'Le « ta-da ! »':['Un arpège de l\'accord qui monte, avec une longue note finale.','C\'est l\'effet « rideau qui s\'ouvre » : on présente un personnage.','Les entrées de personnages et les fins de scène.','Joue-le f, avec la pédale sur la dernière note.','Ajoute un trille sur la dernière note.'],
+ 'L\'arpège 8-bit':['L\'accord égrené vite, monté puis redescendu.','Les vieilles consoles ne jouaient que 3 ou 4 sons à la fois : les arpèges rapides simulaient des accords.','Les musiques de jeux des années 80 et 90.','Joue-le très régulier, comme une machine.','Change d\'accord à chaque temps.'],
+ 'La fanfare de victoire':['Un arpège qui monte vers l\'octave, puis La♭ – Si♭ – Do.','Les accords ♭VI et ♭VII empruntés au mineur donnent un éclat triomphal.','Les fins de niveau et de combat.','Joue chaque note bien détachée, comme une trompette.','Ajoute les accords La♭ – Si♭ – Do à la main gauche.']});
+Object.assign(TRICKS,{
+ anime:[{n:'Le Royal Road éclair',c:[['Fmaj7',1],['G7',1],['Em7',1],['Am',1],['C',4]],d:'Les quatre accords en une mesure pour relancer le refrain.'},{n:'Le coup de camion',c:[['G',2],['A7',2],['D',4]],d:'Le V7 de la nouvelle tonalité : le dernier refrain monte d\'un ton.'}],
+ cartoon:[{n:'Le II7 de cartoon',c:[['C',2],['D7',2],['G7',2],['C',2]],d:'La dominante de la dominante : un clin d\'œil swing.'},{n:'La quinte qui monte',c:[['C',1],['Caug',1],['C6',1],['C7',1],['F',4]],d:'Le suspense comique avant la chute.'}],
+ game:[{n:'La cadence de victoire',c:[['Ab',2],['Bb',2],['C',4]],d:'♭VI – ♭VII – I : fin de niveau.'},{n:'La boucle de donjon',c:[['Am',2],['F',2],['G',2],['E',2]],d:'Le V à la fin ramène au début de la boucle.'}]});
+LCAT.anime='Anime';LCAT.cartoon='Dessin animé';LCAT.game='Jeux vidéo';
+LICKS2.push(
+ {c:'anime',n:'La note longue du refrain',ctx:[['F',2],['G',2],['C',4]],m:[[69,.5],[72,.5],[74,.5],[76,.5],[79,2],[76,4]],w:'Montée en croches vers la quinte, tenue, puis retombée sur la tierce.',u:'Au sommet d\'un refrain.',f:'1-2-3-4, 5 sur la note longue.'},
+ {c:'cartoon',n:'La chute',ctx:[['G7',2],['C',2]],m:[[84,.25],[83,.25],[82,.25],[81,.25],[80,.25],[79,.25],[78,.25],[77,.25],[60,2]],w:'Une descente chromatique rapide puis une note grave : quelqu\'un tombe !',u:'Pour un effet comique.',f:'3-2-1 répété, la main glisse vers le grave.'},
+ {c:'game',n:'Le jingle de l\'objet trouvé',ctx:[['C',4]],m:[[72,.25],[76,.25],[79,.25],[84,.25],[79,.25],[84,.25],[88,2.5]],w:'Un arpège rapide qui monte jusqu\'à l\'octave aiguë.',u:'Pour marquer une récompense.',f:'1-2-3-5, puis la main saute.'});
+RCAT.splice(RCAT.length-1,0,['screen','Anime, jeux & cartoons']);
+RECIPES.push(
+ {cat:'screen',lvl:2,title:'Le Royal Road des génériques',deg:'IV – V – iii – vi',rh:'pop',bpm:80,songs:'Omniprésent dans la J-pop et les génériques d\'anime (on l\'appelle « ōdō shinkō », la progression royale).',
+  why:'IVmaj7 – V7 donne l\'élan, iii7 – vi la nostalgie : on part vers la lumière et on retombe en douceur.',tip:'Main droite serrée autour de Mi – La – Do, seules une ou deux notes bougent.',practice:'4 tours lents, puis en arpège montant, puis en croches rock.',
+  ch:[['F','maj7',null,[41,53],[64,69,72]],['G','7',null,[43,55],[65,71,74]],['E','m7',null,[40,52],[62,67,71]],['A','m',null,[45,57],[64,69,72]]]},
+ {cat:'screen',lvl:3,title:'La modulation du dernier refrain',deg:'V – V7/II – II (+1 ton)',rh:'pop',bpm:84,songs:'Le procédé classique des derniers refrains, en anime comme en pop.',
+  why:'L\'accord A7 est le V7 de Ré : il fait monter toute la musique d\'un ton, d\'un coup.',tip:'Garde la même forme de main, déplace-la juste d\'un ton.',practice:'Joue ta grille en Do, puis A7, puis la même grille en Ré.',
+  ch:[['G','',null,[43,55],[62,67,71]],['A','7',null,[45,57],[61,64,67]],['D','',null,[38,50],[62,66,69]],['D','',null,[38,50],[66,69,74]]]},
+ {cat:'screen',lvl:2,title:'Le turnaround des cartoons',deg:'I – VI7 – II7 – V7',rh:'block',bpm:120,songs:'Le ragtime et le swing des cartoons des années 30 à 50.',
+  why:'Chaque accord est la dominante du suivant : la musique ne tient pas en place, comme les personnages.',tip:'Basse sur 1 et 3, accord sur 2 et 4 (« oom-pah »).',practice:'Lentement en accords plaqués, puis en oom-pah, puis swing.',
+  ch:[['C','',null,[48],[64,67,72]],['A','7',null,[45],[61,64,67]],['D','7',null,[50],[60,62,66]],['G','7',null,[43],[59,62,65]]]},
+ {cat:'screen',lvl:1,title:'La magie lydienne',deg:'I – II',rh:'arp',bpm:72,songs:'La gamme lydienne du générique des Simpson et de nombreuses scènes de magie.',
+  why:'Le Ré majeur apporte le Fa♯ : la note lydienne, lumineuse et étrange.',tip:'Garde Do à la basse sous le Ré majeur (D/C).',practice:'Alterne C et D/C en arpèges lents avec la pédale.',
+  ch:[['C','',null,[36,48],[64,67,72]],['D','','C',[36,48],[62,66,69]],['C','',null,[36,48],[64,67,72]],['D','','C',[36,48],[66,69,74]]]},
+ {cat:'screen',lvl:1,title:'La cadence de victoire',deg:'♭VI – ♭VII – I',rh:'pop',bpm:100,songs:'Les fins de niveau des jeux de plateforme : on la surnomme « cadence Mario ».',
+  why:'Deux accords majeurs empruntés au mineur montent vers la tonique : effet de triomphe garanti.',tip:'Joue les trois accords à la même forme de main, en glissant.',practice:'Termine chaque morceau que tu connais par cette cadence.',
+  ch:[['Ab','',null,[44],[60,63,68]],['Bb','',null,[46],[62,65,70]],['C','',null,[48],[64,67,72]],['C','',null,[36,48],[67,72,76]]]},
+ {cat:'screen',lvl:1,title:'La boucle de donjon',deg:'i – ♭VI – ♭VII – V',rh:'arp',bpm:96,songs:'Les grottes, donjons et ambiances d\'aventure des jeux de rôle.',
+  why:'Le mineur naturel donne le mystère ; le V majeur (Mi) à la fin relance la boucle.',tip:'Main gauche en ostinato de croches, main droite en accords tenus.',practice:'8 tours sans t\'arrêter : une boucle de jeu doit pouvoir durer.',
+  ch:[['A','m',null,[45,52],[60,64,69]],['F','',null,[41,48],[60,65,69]],['G','',null,[43,50],[59,62,67]],['E','',null,[40,47],[59,64,68]]]});
+
+
+/* ============ MORCEAUX COMPLETS (domaine public) ============ */
+const FULLS=[
+ {id:'ode',g:'classique',t:'Ode à la joie',a:'Ludwig van Beethoven (1824, domaine public)',key:'D',kfix:{t:2,min:false},bpm:100,bpb:4,sty:'alberti',harm:1,
+  w:'Le thème de la 9e Symphonie, harmonisé avec une basse d\'Alberti : la régularité de la main gauche et le legato.',
+  sec:{'Thème':{ch:['D','A','D','A','D','A','D','A D'],mel:'F#5/1 F#5/1 G5/1 A5/1 | A5/1 G5/1 F#5/1 E5/1 | D5/1 D5/1 E5/1 F#5/1 | F#5/1.5 E5/.5 E5/2 | F#5/1 F#5/1 G5/1 A5/1 | A5/1 G5/1 F#5/1 E5/1 | D5/1 D5/1 E5/1 F#5/1 | E5/1.5 D5/.5 D5/2'},
+   'Milieu':{ch:['A','A D','A D','D A','D','A','D','A D'],mel:'E5/1 E5/1 F#5/1 D5/1 | E5/1 F#5/.5 G5/.5 F#5/1 D5/1 | E5/1 F#5/.5 G5/.5 F#5/1 E5/1 | D5/1 E5/1 A4/2 | F#5/1 F#5/1 G5/1 A5/1 | A5/1 G5/1 F#5/1 E5/1 | D5/1 D5/1 E5/1 F#5/1 | E5/1.5 D5/.5 D5/2'}},
+  form:['Thème','Milieu','Thème'],end:'D'},
+ {id:'elise',g:'classique',t:'Lettre à Élise (partie A)',a:'Ludwig van Beethoven (1810, domaine public)',key:'Am',kfix:{t:9,min:true},bpm:150,bpb:3,sty:'none',
+  w:'Le célèbre thème en la mineur : le passage de la mélodie d\'une main à l\'autre et les arpèges de la main gauche. Ici, un temps = une croche.',
+  sec:{'Thème':{ch:['Am','Am','Am','E','Am','Am','Am','E','Am'],mel:'r/2 E5/.5 D#5/.5 | E5/.5 D#5/.5 E5/.5 B4/.5 D5/.5 C5/.5 | A4/1 r/.5 C4/.5 E4/.5 A4/.5 | B4/1 r/.5 E4/.5 G#4/.5 B4/.5 | C5/1 r/.5 E4/.5 E5/.5 D#5/.5 | E5/.5 D#5/.5 E5/.5 B4/.5 D5/.5 C5/.5 | A4/1 r/.5 C4/.5 E4/.5 A4/.5 | B4/1 r/.5 E4/.5 C5/.5 B4/.5 | A4/2 r/1',
+    lh:'r/3 | r/3 | A2/.5 E3/.5 A3/.5 r/1.5 | E2/.5 E3/.5 G#3/.5 r/1.5 | A2/.5 E3/.5 A3/.5 r/1.5 | r/3 | A2/.5 E3/.5 A3/.5 r/1.5 | E2/.5 E3/.5 G#3/.5 r/1.5 | A2/.5 E3/.5 A3/2'}},
+  form:['Thème','Thème']},
+ {id:'saints',g:'jazz',t:'When the Saints Go Marching In',a:'Traditionnel (domaine public)',key:'F',kfix:{t:5,min:false},bpm:132,bpb:4,sty:'stride',swing:1,harm:1,
+  w:'Le standard de La Nouvelle-Orléans en stride : basse sur 1 et 3, accords sur 2 et 4, et le swing.',
+  sec:{'Chorus':{ch:['F','F','F','F','F','F','F','C7','F','F','F7','Bb','F','F','C7','F'],mel:'r/1 F5/1 A5/1 Bb5/1 | C6/4 | r/1 F5/1 A5/1 Bb5/1 | C6/4 | r/1 F5/1 A5/1 Bb5/1 | C6/2 A5/2 | F5/2 A5/2 | G5/4 | r/1 A5/1 A5/1 G5/1 | F5/3 F5/1 | A5/2 C6/2 | C6/1 Bb5/3 | r/1 A5/1 Bb5/1 C6/1 | A5/2 F5/2 | G5/4 | F5/4'}},
+  form:['Chorus','Chorus']},
+ {id:'grace',g:'gospel',t:'Amazing Grace',a:'Traditionnel (domaine public)',key:'G',kfix:{t:7,min:false},bpm:76,bpb:3,sty:'hymn',harm:1,
+  w:'Le cantique à 3 temps, harmonisé comme à l\'église : accords pleins, basse sur le 1, et un walk-up gospel à la reprise.',
+  sec:{'Couplet':{ch:['G','G','G7','C','G','G','Em','D','D','G','G7','C','G','Em','D7','G','G'],mel:'r/2 D5/1 | G5/2 B5/.5 G5/.5 | B5/2 A5/1 | G5/2 E5/1 | D5/2 D5/1 | G5/2 B5/.5 G5/.5 | B5/2 A5/1 | D6/3 | D6/2 B5/1 | D6/2 B5/.5 G5/.5 | B5/2 A5/1 | G5/2 E5/1 | D5/2 D5/1 | G5/2 B5/.5 G5/.5 | B5/2 A5/1 | G5/3 | r/2 D5/1'}},
+  form:['Couplet','Couplet']}
+];
+function pName(s){const m=s.match(/^([A-G])(#|b)?(-?\d)$/);if(!m)return null;return 12*(+m[3]+1)+{C:0,D:2,E:4,F:5,G:7,A:9,B:11}[m[1]]+(m[2]==='#'?1:m[2]==='b'?-1:0);}
+function parseLine(str){return str.split('|').map(bar=>bar.trim().split(/\s+/).filter(Boolean).map(tk=>{const[n,d]=tk.split('/');return{m:n==='r'?null:pName(n),d:+d};}));}
+function fullAcc(sty,sym,bpb,swing){const c=parseChord(sym);if(!c)return[];const pcs=[...new Set(c.ints.filter(i=>i<12).map(i=>mod(c.root+i)))],b=36+mod(c.bass-36),mid=stack(pcs,52-(pcs[0]>4?12:0)).filter(m=>m<68),third=mid.find(m=>mod(m-c.root)===3||mod(m-c.root)===4)??mid[1]??b+12,out=[],n=(t,d,ms,v=.8)=>out.push([t,d,ms,v]);
+  if(sty==='arp8'){[b,b+7,b+12,third+12>76?third:third+12,b+12,b+7,b+12,third].forEach((m,i)=>i<bpb*2&&n(i*.5,.5,[m],i?.6:.85));}
+  else if(sty==='alberti'){const v=stack(pcs,48);[v[0],v[v.length-1],v[1],v[v.length-1]].concat([v[0],v[v.length-1],v[1],v[v.length-1]]).forEach((m,i)=>i<bpb*2&&n(i*.5,.5,[m],.55));}
+  else if(sty==='waltz'){n(0,1,[b],.8);n(1,.9,mid,.5);n(2,.9,mid,.5);}
+  else if(sty==='hymn'){n(0,1,[b,b+12],.85);n(1,1,mid,.55);n(2,1,mid,.5);}
+  else if(sty==='stride'){n(0,1,[b,b+12],.9);n(1,.8,mid,.6);n(2,1,[b+7],.85);n(3,.8,mid,.6);}
+  else if(sty==='boogie'){const r=b;[r,r+4,r+7,r+9,r+10,r+9,r+7,r+4].forEach((m,i)=>n(i*.5,.5,[m],i%2?.6:.8));}
+  else if(sty==='city'){n(0,1.5,[b,b+12],.85);n(0,.5,mid,.6);n(1.5,.5,mid,.65);n(2.5,1,mid,.6);n(3.5,.5,[b+12],.6);}
+  else if(sty==='bossa'){n(0,1.5,[b],.85);n(1.5,.5,[b+7],.7);n(2,1.5,[b+7],.8);n(3.5,.5,[b],.7);[[0,.5],[1.5,.5],[2.5,.5],[3,1]].forEach(([t,d])=>n(t,d,mid,.55));}
+  else if(sty==='ostinato'){[b,b+7,b+12,b+7,b,b+7,b+12,b+7].forEach((m,i)=>n(i*.5,.5,[m],i%4?.6:.85));n(0,4,mid,.35);}
+  else if(sty==='chip'){[b,b+12,b,b+12,b,b+12,b,b+12].forEach((m,i)=>n(i*.5,.4,[m],i%2?.6:.85));n(0,.5,mid,.5);n(2,.5,mid,.45);}
+  if(swing)out.forEach(e=>{const f=e[0]%1;if(Math.abs(f-.5)<.01)e[0]=Math.floor(e[0])+.67;if(Math.abs(e[1]-.5)<.01)e[1]=f>.4?.33:.67;});
+  return out;}
+function buildFull(F){const N=[],sections=[];let bar=0;const bpb=F.bpb;
+  F.form.forEach((name,fi)=>{const S0=F.sec[name],tr=S0.tr||0,mel=parseLine(S0.mel),lh=S0.lh?parseLine(S0.lh):null,start=bar;
+    S0.ch.forEach((chs,bi)=>{const b0=(bar+bi)*bpb,syms=chs.split(' '),seg=bpb/syms.length;
+      if(F.sty!=='none')syms.forEach((sym,k)=>fullAcc(F.sty,sym,seg===bpb?bpb:seg,F.swing).forEach(([t,d,ms,v])=>{if(t<seg)ms.forEach(m=>N.push([m,b0+k*seg+t,Math.min(d,seg-t+.5),'lh',v]));}));
+      if(lh&&lh[bi]){let t=0;lh[bi].forEach(x=>{if(x.m!=null)N.push([x.m,b0+t,x.d,'lh',.8]);t+=x.d;});}
+      let t=0;(mel[bi]||[]).forEach((x,j)=>{if(x.m!=null){let st=t,du=x.d;if(F.swing){const f=st%1;if(Math.abs(f-.5)<.01)st=Math.floor(st)+.67;if(Math.abs(du-.5)<.01)du=f>.4?.33:.67;}
+        const m=x.m+tr;N.push([m,b0+st,du,'rh',1.05]);if(F.oct)N.push([m-12,b0+st,du,'rh',.75]);
+        if(F.harm&&(j===0||st%2===0)&&du>=1){const c=parseChord(syms[Math.min(syms.length-1,Math.floor(st/seg))]);if(c){const pcs=c.ints.filter(i=>i<12).map(i=>mod(c.root+i));let h=m-3;while(h>m-10&&!pcs.includes(mod(h)))h--;if(h>m-10&&h>58)N.push([h,b0+st,du,'rh',.6]);}}}
+        t+=x.d;});});
+    sections.push({name:name+(F.form.filter(x=>x===name).length>1?' '+(F.form.slice(0,fi+1).filter(x=>x===name).length):''),start,repeat:1,bars:S0.ch.slice()});bar+=S0.ch.length;});
+  if(F.end){const c=parseChord(F.end),pcs=c.ints.map(i=>mod(c.root+i));const b0=bar*bpb;[36+mod(c.root-36),48+mod(c.root-48)].forEach(m=>N.push([m,b0,bpb,'lh',.85]));stack(pcs,60).concat([72+mod(c.root)]).forEach(m=>N.push([m,b0,bpb,'rh',.85]));sections.push({name:'Fin',start:bar,repeat:1,bars:[F.end]});}
+  return{id:'full-'+F.id,title:F.t,artist:F.a,version:'Morceau complet',key:F.key,bpm:F.bpm,beatsPerBar:bpb,kfix:F.kfix,notes:N.sort((a,b)=>a[1]-b[1]||a[0]-b[0]),
+   note:F.w+(/originale/.test(F.a)?' Composée pour l\'app dans le style du genre : tu peux la jouer, la modifier et la partager librement.':' Œuvre du domaine public, arrangée pour l\'app.'),
+   sections,form:sections.map(s=>s.name),sources:[]};}
+function openFull(id){if(id==='npark'){const sg=S.saved.find(x=>x.id==='npark')||{...NPARK,notes:npNotes()};if(!S.saved.includes(sg)){S.saved.unshift(sg);persist();}S.song=sg;applyPrefs(sg);S.songView='play';S.tab='songs';return;}
+  const F=FULLS.find(x=>x.id===id);if(!F)return;let sg=S.saved.find(x=>x.id==='full-'+id);if(!sg){sg=buildFull(F);S.saved.push(sg);persist();}S.song=sg;applyPrefs(sg);S.sRhy='notes';S.songView='play';S.tab='songs';}
+function fullLibHTML(){return`<div class="card"><h3>🎼 Morceaux complets par genre</h3><p class="small">Toutes les notes, les deux mains, du début à la fin : à écouter, à travailler main par main et à suivre au micro. Œuvres du domaine public, arrangées pour l'app.</p>
+  ${GENRES.map(([g,n])=>{const L=FULLS.filter(f=>f.g===g);const np=g==='game';if(!L.length&&!np)return'';return`<p class="small" style="margin:8px 0 2px"><b>${n}</b></p><div class="chips sm">${L.map(f=>`<button class="chip" data-fullopen="${f.id}">${f.t}</button>`).join('')}${np?'<button class="chip" data-fullopen="npark">National Park</button>':''}</div>`;}).join('')}</div>`;}
+FULLS.forEach(F=>{const L=GREP[F.g];if(L&&!L.some(p=>p.full===F.id))L.unshift({t:F.t+' (complet)',a:F.a,l:F.id==='elise'||F.id==='saints'||F.id==='rag'?3:F.id==='ballade'||F.id==='ode'||F.id==='grace'?1:2,k:F.key,w:F.w,full:F.id});});
+{const np=GREP.game&&GREP.game.find(p=>/National Park/.test(p.t));if(np)np.full='npark';}
+
+
+/* ============ AJOUTS : NOËL, CLASSIQUES, BANDES ORIGINALES ============ */
+FULLS.push(
+ {id:'jingle',g:'pop',t:'Jingle Bells (Noël)',a:'James Lord Pierpont (1857, domaine public)',key:'C',kfix:{t:0,min:false},bpm:120,bpb:4,sty:'stride',harm:1,
+  w:'Le refrain le plus connu de Noël en version pop rebondissante, deux fois, avec deux fins différentes.',
+  sec:{'Refrain':{ch:['C','C','C','C','F','C','D7','G'],mel:'E5/1 E5/1 E5/2 | E5/1 E5/1 E5/2 | E5/1 G5/1 C5/1.5 D5/.5 | E5/4 | F5/1 F5/1 F5/1.5 F5/.5 | F5/1 E5/1 E5/1 E5/.5 E5/.5 | E5/1 D5/1 D5/1 E5/1 | D5/2 G5/2'},
+   'Refrain final':{ch:['C','C','C','C','F','C','G7','C'],mel:'E5/1 E5/1 E5/2 | E5/1 E5/1 E5/2 | E5/1 G5/1 C5/1.5 D5/.5 | E5/4 | F5/1 F5/1 F5/1.5 F5/.5 | F5/1 E5/1 E5/1 E5/.5 E5/.5 | G5/1 G5/1 F5/1 D5/1 | C5/4'}},
+  form:['Refrain','Refrain final','Refrain','Refrain final'],end:'C6'},
+ {id:'douce',g:'pop',t:'Douce nuit (Noël)',a:'Franz Xaver Gruber (1818, domaine public)',key:'C',kfix:{t:0,min:false},bpm:66,bpb:3,sty:'waltz',harm:1,
+  w:'Le chant de Noël à 3 temps, tout en douceur : basse sur le 1, accords légers, mélodie bien liée.',
+  sec:{'Couplet':{ch:['C','C','C','C','G7','G7','C','C','F','F','C','C','F','F','C','C','G7','G7','C','C','C','G7','C','C'],
+   mel:'G5/1.5 A5/.5 G5/1 | E5/3 | G5/1.5 A5/.5 G5/1 | E5/3 | D6/2 D6/1 | B5/3 | C6/2 C6/1 | G5/3 | A5/2 A5/1 | C6/1.5 B5/.5 A5/1 | G5/1.5 A5/.5 G5/1 | E5/3 | A5/2 A5/1 | C6/1.5 B5/.5 A5/1 | G5/1.5 A5/.5 G5/1 | E5/3 | D6/2 D6/1 | F6/1.5 D6/.5 B5/1 | C6/3 | E6/3 | C6/1.5 G5/.5 E5/1 | G5/1.5 F5/.5 D5/1 | C5/3 | C5/3'}},
+  form:['Couplet','Couplet']},
+ {id:'wewish',g:'pop',t:'We Wish You a Merry Christmas (Noël)',a:'Traditionnel anglais (domaine public)',key:'C',kfix:{t:0,min:false},bpm:132,bpb:3,sty:'waltz',harm:1,
+  w:'Le chant joyeux à 3 temps : les montées de la mélodie et les dominantes secondaires (D7, E7).',
+  sec:{'Couplet':{ch:['C','C','F','D7','G','Am','F','G7','C'],mel:'r/2 G4/1 | C5/1 C5/.5 D5/.5 C5/.5 B4/.5 | A4/1 A4/1 A4/1 | D5/1 D5/.5 E5/.5 D5/.5 C5/.5 | B4/1 G4/1 G4/1 | E5/1 E5/.5 F5/.5 E5/.5 D5/.5 | C5/1 A4/1 G4/.5 G4/.5 | A4/1 D5/1 B4/1 | C5/2 G4/1'},
+   'Refrain':{ch:['C','G','Am','G','C','C','F G7','C'],mel:'C5/1 C5/1 C5/1 | B4/2 B4/1 | C5/1 B4/1 A4/1 | G4/2 D5/1 | E5/1 D5/1 C5/1 | G5/1 G4/1 G4/.5 G4/.5 | A4/1 D5/1 B4/1 | C5/3'}},
+  form:['Couplet','Refrain','Couplet']},
+ {id:'deck',g:'pop',t:'Deck the Halls (Noël)',a:'Traditionnel gallois (domaine public)',key:'C',kfix:{t:0,min:false},bpm:112,bpb:4,sty:'stride',harm:1,
+  w:'Le chant festif : les gammes rapides de la mélodie et la main gauche qui rebondit.',
+  sec:{'Couplet':{ch:['C','C','G7 C','G7 C','C','C','G7 C','G7 C'],mel:'G5/1.5 F5/.5 E5/1 D5/1 | C5/1 D5/1 E5/1 C5/1 | D5/.5 E5/.5 F5/.5 D5/.5 E5/1.5 D5/.5 | C5/1 B4/1 C5/2 | G5/1.5 F5/.5 E5/1 D5/1 | C5/1 D5/1 E5/1 C5/1 | D5/.5 E5/.5 F5/.5 D5/.5 E5/1.5 D5/.5 | C5/1 B4/1 C5/2'},
+   'Milieu':{ch:['G','C G','D7','G'],mel:'D5/1.5 E5/.5 F5/1 D5/1 | E5/1.5 F5/.5 G5/1 D5/1 | E5/.5 F#5/.5 G5/1 A5/.5 B5/.5 C6/1 | B5/1 A5/1 G5/2'},
+   'Fin':{ch:['C','C','F','G7 C'],mel:'G5/1.5 F5/.5 E5/1 D5/1 | C5/1 D5/1 E5/1 C5/1 | A5/.5 A5/.5 A5/.5 A5/.5 G5/1.5 F5/.5 | E5/1 D5/1 C5/2'}},
+  form:['Couplet','Milieu','Fin']}
+);
+const IMPT={nin:'NinSheetMusic propose souvent la partition et un fichier MIDI de ce morceau : télécharge le MIDI, puis importe-le dans Morceaux pour avoir toutes les notes.',
+ pd:'Œuvre du domaine public : la partition est gratuite sur IMSLP, et des fichiers MusicXML ou MIDI libres existent. Importe-le dans Morceaux : l\'app lira toutes les notes.',
+ own:'Morceau protégé par le droit d\'auteur : je ne peux pas en écrire les notes. Si tu as la partition en MIDI ou MusicXML (achetée ou fournie avec un recueil), importe-la dans Morceaux : l\'app lira toutes les notes.'};
+const ADD={
+ classique:[{t:'Clair de lune (Suite bergamasque)',a:'Claude Debussy (1905, domaine public)',l:3,k:'Db',w:'Ré♭ majeur, mesure à 9/8, « Andante très expressif ». Forme A – B – A\' : le thème pianissimo en accords, le milieu qui s\'anime sur des arpèges, puis le retour du thème. On y travaille les voix intérieures, la pédale et les nuances très douces.',imp:'pd'},
+  {t:'Prélude en do♯ mineur op. 3 n°2',a:'Sergueï Rachmaninov (1892, domaine public)',l:3,k:'C#m',w:'« Lento » : le motif de trois notes La – Sol♯ – Do♯ en octaves, puis des accords très graves et très doux. La partie centrale « Agitato » accélère, et la reprise finale, écrite sur quatre portées, demande des accords puissants des deux mains.',imp:'pd'},
+  {t:'Vocalise op. 34 n°14',a:'Sergueï Rachmaninov (1915, domaine public)',l:3,k:'',w:'Une mélodie sans paroles, très longue : le chant au piano, le legato et l\'équilibre mélodie / accompagnement.',imp:'pd'}],
+ pop:[{t:'All I Want for Christmas Is You',a:'Mariah Carey',l:2,k:'',w:'L\'intro libre, puis le rythme « boogie » en croches et les accords qui changent vite (dont le iv mineur).',imp:'own'},
+  {t:'Last Christmas',a:'Wham!',l:1,k:'',w:'Quatre accords en boucle et un rythme synthé régulier : idéal pour accompagner le chant.',imp:'own'},
+  {t:'Jingle Bell Rock',a:'Bobby Helms',l:2,k:'',w:'Le swing, les accords de passage et les dominantes secondaires.',imp:'own'}],
+ city:[{t:'Christmas Eve',a:'Tatsuro Yamashita',l:2,k:'',w:'La city pop de Noël : un ostinato inspiré du Canon de Pachelbel et des harmonies vocales riches.',imp:'own'},
+  {t:'Ride on Time',a:'Tatsuro Yamashita',l:3,k:'',w:'Le groove funk : accords en contretemps, basse syncopée et accords de 7e et 9e.',imp:'own'},
+  {t:'Sparkle',a:'Tatsuro Yamashita',l:3,k:'',w:'Le « cutting » de guitare transposé au piano : accords courts, très précis, sur les doubles croches.',imp:'own'},
+  {t:'Take You to the Sky High',a:'Toshiki Kadomatsu',l:3,k:'',w:'La city pop dansante : basse en octaves, accords maj7 et 9 syncopés.',imp:'own'}],
+ film:[{t:'Concerning Hobbits (Le Seigneur des anneaux)',a:'Howard Shore',l:2,k:'',w:'Le thème de la Comté : une mélodie pentatonique au parfum celtique sur des accords simples.',imp:'own'},
+  {t:'May It Be (Le Seigneur des anneaux)',a:'Enya',l:2,k:'',w:'Une ballade lente : accords tenus, mélodie très liée, pédale.',imp:'own'},
+  {t:'Into the West (Le Seigneur des anneaux)',a:'Howard Shore, Fran Walsh & Annie Lennox',l:2,k:'',w:'La ballade finale : accompagnement en arpèges et montée d\'intensité.',imp:'own'},
+  {t:'Azur et Asmar – thème principal',a:'Gabriel Yared',l:2,k:'',w:'Une mélodie orientale et douce : les couleurs modales (secondes augmentées) et le legato.',imp:'own'}],
+ anime:[{t:'Crossing Field (Sword Art Online, opening 1)',a:'LiSA',l:3,k:'',w:'Le générique rock rapide : main gauche en octaves, accords puissants et montée vers le refrain.',imp:'own'},
+  {t:'Colors (Code Geass, opening 1)',a:'FLOW',l:2,k:'',w:'Le rock d\'anime : accords plaqués en croches et refrain qui explose.',imp:'own'},
+  {t:'Kaidoku Funō (Code Geass, opening 2)',a:'Jinn',l:3,k:'',w:'Le rock tendu : riffs, accents et changements d\'énergie.',imp:'own'},
+  {t:'Kansou no Uta (Légende des héros galactiques, ending de la 3e série OVA)',a:'Kei Ogura (paroles et chant), Katsu Hoshi (musique et arrangement)',l:2,k:'',w:'Une ballade de fin de série, chantée : l\'accompagnement de la voix et les accords posés.',imp:'own'}],
+ game:[{t:'Route 1 (Pokémon Rouge et Bleu)',a:'Junichi Masuda',l:1,k:'',w:'Une mélodie joyeuse en boucle sur peu d\'accords : la régularité et la main gauche rebondissante.',imp:'nin'},
+  {t:'Lavender Town (Pokémon Rouge et Bleu)',a:'Junichi Masuda',l:2,k:'',w:'Une boucle étrange et inquiétante : les dissonances et les notes répétées dans l\'aigu.',imp:'nin'},
+  {t:'Pokémon Center (Pokémon Rouge et Bleu)',a:'Junichi Masuda',l:1,k:'',w:'Une petite boucle rassurante : idéale pour débuter les deux mains.',imp:'nin'},
+  {t:'La Fontaine des Fées (The Legend of Zelda)',a:'Koji Kondo',l:2,k:'',w:'Les arpèges en cascade façon harpe sur des accords de 7e majeure : la pédale et la légèreté.',imp:'nin'},
+  {t:'Song of Storms (Zelda : Ocarina of Time)',a:'Koji Kondo',l:2,k:'',w:'La valse en mineur : main gauche « boum – tchak – tchak » et mélodie sautillante.',imp:'nin'}]};
+Object.entries(ADD).forEach(([g,L])=>{const R=GREP[g];if(!R)return;L.forEach(p=>{if(!R.some(x=>x.t===p.t))R.push(p);});});
+FULLS.forEach(F=>{const L=GREP[F.g];if(L&&!L.some(p=>p.full===F.id))L.unshift({t:F.t+' (complet)',a:F.a,l:F.id==='deck'?2:1,k:F.key,w:F.w,full:F.id});});
+{const ip=GREP.bossa&&GREP.bossa.find(p=>/Ipanema/.test(p.t));if(ip){ip.t='Garota de Ipanema (The Girl from Ipanema) · grille complète';ip.w='La grille entière A – A – B – A (40 mesures, avec un pont de 16) : le G7 et le G♭7 qui glissent, puis le pont qui part en G♭maj7, F♯m7, Gm7 et Am7. La mélodie est protégée : joue la grille, et importe un MIDI si tu as la partition.';
+  ip.g=['Fmaj7','Fmaj7','G7','G7','Gm7','Gb7','Fmaj7','Gb7','Fmaj7','Fmaj7','G7','G7','Gm7','Gb7','Fmaj7','Fmaj7','Gbmaj7','Gbmaj7','B7','B7','F#m7','F#m7','D7','D7','Gm7','Gm7','Eb7','Eb7','Am7','D7','Gm7','C7','Fmaj7','Fmaj7','G7','G7','Gm7','Gb7','Fmaj7','Gb7'];}}
+
 /* ============ UNIVERS « VILLE-PARC » ============ */
-const TABORDER=['start','play','arps','fing','ext','keys','modes','voicing','recipes','songs','artist','impro','genre','styles','tiers','train','mic','sim','deg'];
+const TABORDER=['start','play','arps','fing','ext','keys','modes','voicing','recipes','songs','artist','impro','genre','styles','tiers','train','mic','sim','deg','harm','voice'];
 const GUIDE={start:['Bienvenue au parc','On commence tout doucement : une étape par jour, comme une promenade.'],play:['Au kiosque','Lentement d\'abord. La vitesse viendra toute seule.'],
  arps:['Les petites rivières','Un arpège, c\'est un accord qui s\'écoule note après note. Fabrique le tien en bas de page.'],keys:['Le plan du parc','Touche le cercle : toute la fiche change de tonalité.'],
  modes:['Même allée, autre point de vue','Mêmes touches, autre maison : voilà un mode.'],voicing:['L\'art de placer','Garde les notes communes et bouge le moins possible.'],
  recipes:['Le carnet de recettes','Écoute deux fois, note le voicing, puis joue-le.'],songs:['Ton répertoire','Note une grille, choisis la version solo ou chant, et à toi de jouer.'],
  genre:['Une promenade complète','Coche les étapes du programme : ta progression est gardée.'],styles:['Les grandes époques','Chaque style a sa main gauche : commence toujours par elle.'],
+ harm:['La bibliothèque du parc','Un chapitre par jour, et l\'harmonie devient claire.'],
+ voice:['Le kiosque à musique','Le chanteur d\'abord, le piano ensuite.'],
  deg:['Les numéros du parc','Retiens la formule : majeurs 1, 4, 5 · mineurs 2, 3, 6 · diminué 7.'],
  sim:['Le piano du kiosque','Touche trois notes : l\'app te dit leur nom, leur degré et comment on les écrit.'],
  mic:['Le parc écoute','Plaque l\'accord et laisse-le sonner une seconde : l\'app te répond.'],
@@ -3637,10 +4389,10 @@ function coachTry(k){const L=PB.lastTrig;S.arp=k;
   savePrefs();keep(()=>{});if(!L)return;const b=document.querySelector(`[data-${L.k}="${L.v}"]`);if(b)b.click();}
 
 
-const TABN={deg:['Degrés','Les accords de chaque degré, majeur ou mineur'],sim:['Simulateur','Tape un accord, vois son nom en direct'],mic:['Test micro','Ton piano jugé en direct'],ext:['9 · 11 · 13','Les accords enrichis degré par degré'],impro:['Improviser','Enchaînements et mélodies générés, boucle d\'impro'],fing:['Doigtés','Placer n\'importe quel accord, jusqu\'à la 13e'],artist:['Artistes','Chopin, Debussy, ABBA… à fond'],start:['Débuter','Le piano en partant de zéro'],play:['Jouer','Posture, exercices, accompagnements'],arps:['Arpèges','Toutes les formations, ta fabrique'],keys:['Tonalités','La fiche complète de chaque tonalité'],
+const TABN={harm:['Cours d\'harmonie','Des intervalles à l\'analyse, en 15 chapitres'],voice:['Accompagner une voix','Le tuto de A à Z'],deg:['Degrés','Les accords de chaque degré, majeur ou mineur'],sim:['Simulateur','Tape un accord, vois son nom en direct'],mic:['Test micro','Ton piano jugé en direct'],ext:['9 · 11 · 13','Les accords enrichis degré par degré'],impro:['Improviser','Enchaînements et mélodies générés, boucle d\'impro'],fing:['Doigtés','Placer n\'importe quel accord, jusqu\'à la 13e'],artist:['Artistes','Chopin, Debussy, ABBA… à fond'],start:['Débuter','Le piano en partant de zéro'],play:['Jouer','Posture, exercices, accompagnements'],arps:['Arpèges','Toutes les formations, ta fabrique'],keys:['Tonalités','La fiche complète de chaque tonalité'],
  modes:['Modes','Sept couleurs pour une gamme'],voicing:['Voicing','Placer les accords comme un pro'],recipes:['Recettes','Progressions de vraies chansons'],songs:['Morceaux','Tes grilles arrangées au piano'],
  genre:['Genre à fond','Un parcours complet par genre'],styles:['Styles','De Bach à la neo-soul'],tiers:['Tier lists','Ce qui domine dans chaque genre'],train:['Entraîner','Quiz d\'oreille et de théorie']};
-const NEXT={deg:['keys','train','recipes'],sim:['fing','ext','mic'],mic:['ext','fing','train'],ext:['fing','voicing','impro'],impro:['genre','artist','train'],fing:['ext','voicing','artist'],artist:['fing','genre','songs'],start:['play','sim','deg'],play:['arps','voicing','recipes'],arps:['fing','voicing','tiers'],keys:['deg','modes','train'],modes:['keys','styles','voicing'],voicing:['fing','recipes','artist'],
+const NEXT={harm:['deg','keys','voicing'],voice:['songs','impro','recipes'],deg:['keys','train','recipes'],sim:['fing','ext','mic'],mic:['ext','fing','train'],ext:['fing','voicing','impro'],impro:['genre','artist','train'],fing:['ext','voicing','artist'],artist:['fing','genre','songs'],start:['play','sim','deg'],play:['arps','voicing','recipes'],arps:['fing','voicing','tiers'],keys:['deg','modes','train'],modes:['keys','styles','voicing'],voicing:['fing','recipes','artist'],
  recipes:['songs','voicing','genre'],songs:['recipes','genre','arps'],genre:['impro','artist','styles'],styles:['genre','modes','tiers'],tiers:['genre','styles','keys'],train:['mic','keys','genre']};
 function footer(tab){return`<nav class="next" aria-label="Pages suivantes"><h2>Et ensuite</h2><div class="nextg">${(NEXT[tab]||[]).map(k=>`<button class="nx" data-tab="${k}"><b>${TABN[k][0]}</b><span>${TABN[k][1]}</span></button>`).join('')}</div></nav>`;}
 
@@ -3654,7 +4406,7 @@ function impRun(steps,btn,withRoll,melOnly){const I=S.imp,G=IGEN[I.g],gx=GX[I.g]
     onEnd:()=>document.querySelectorAll('.ibar').forEach(x=>x.classList.remove('cur'))});}
 /* ============ RENDER & EVENTS ============ */
 function render(){applyLayout();exN=0;EX={};const app=document.getElementById('app');
-  const PG={start:renderStart,deg:renderDeg,sim:renderSim,mic:renderMic,ext:renderExt,impro:renderImpro,fing:renderFing,artist:renderArtist,genre:renderGenre,arps:renderArps,keys:renderKeys,songs:renderSongs,recipes:renderRecipes,train:renderTrain,tiers:renderTiers,styles:renderStyles,modes:renderModes,play:renderPlay,voicing:renderVoicing};let pgh=PG[S.tab]();const ix=pgh.indexOf('</section>');if(ix>=0)pgh=pgh.slice(0,ix+10)+planBox(S.tab)+pgh.slice(ix+10);
+  const PG={start:renderStart,deg:renderDeg,harm:renderHarm,voice:renderVoice,sim:renderSim,mic:renderMic,ext:renderExt,impro:renderImpro,fing:renderFing,artist:renderArtist,genre:renderGenre,arps:renderArps,keys:renderKeys,songs:renderSongs,recipes:renderRecipes,train:renderTrain,tiers:renderTiers,styles:renderStyles,modes:renderModes,play:renderPlay,voicing:renderVoicing};let pgh=PG[S.tab]();const ix=pgh.indexOf('</section>');if(ix>=0)pgh=pgh.slice(0,ix+10)+planBox(S.tab)+pgh.slice(ix+10);
   app.innerHTML=banner(S.tab)+keyBar()+instPanel()+pgh+selfCheck(S.tab)+memoCard(S.tab)+footer(S.tab);
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===S.tab));
   document.querySelectorAll('[data-nota]').forEach(t=>t.classList.toggle('on',t.dataset.nota===S.nota));
@@ -3662,11 +4414,12 @@ function render(){applyLayout();exN=0;EX={};const app=document.getElementById('a
   const rqi=document.getElementById('rq');if(rqi){rqi.oninput=e=>{S.rc.q=e.target.value;S.rc.focus=true;keep(()=>{});};if(S.rc.focus){rqi.focus();const L=rqi.value.length;try{rqi.setSelectionRange(L,L);}catch(e){}S.rc.focus=false;}}
   const mt=document.getElementById('micth');if(mt)mt.oninput=e=>{S.mic.th=+e.target.value/100;};const mg=document.getElementById('micgate');if(mg)mg.oninput=e=>{S.mic.gate=+e.target.value/1000;S.mic.autoGate=false;};
   if(S.tab==='songs'&&S.songView==='follow'&&S.song){folStart();folText(true);}
+  const vf=document.getElementById('vofrom'),vt=document.getElementById('voto');if(vf)vf.onchange=e=>{S.vo.from=+e.target.value;keep(()=>{});};if(vt)vt.onchange=e=>{S.vo.to=+e.target.value;keep(()=>{});};
   const ho=document.getElementById('hother');if(ho)ho.onchange=e=>{S.handsOther=e.target.checked;};
   const ft=document.getElementById('ftempo');if(ft)ft.oninput=e=>{S.fol.tempo=+e.target.value/100;const v=document.getElementById('ftempov');if(v)v.textContent=e.target.value+' %';};
   const fth=document.getElementById('fth');if(fth)fth.oninput=e=>{S.fol.th=Math.max(.12,Math.min(.6,1.15-(+e.target.value+15)/100));};
   const fag=document.getElementById('fagc');if(fag)fag.onchange=e=>{S.mic.agc=e.target.checked;if(S.mic.on){stopMic();S.mic.mode='free';startMic();}};
-  const sfI=document.getElementById('scorefile');if(sfI)sfI.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)importFile(f);};
+  ['scorefile','scorefileTop'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=e=>{const f=e.target.files&&e.target.files[0];if(f)importFile(f);};});
   const fi=document.getElementById('fgin');if(fi)fi.onkeydown=e=>{if(e.key==='Enter')ACT.fgGo();};
   const sb=document.getElementById('songbpm');if(sb){sb.oninput=e=>{S.sBpm=+e.target.value;document.getElementById('songbpmv').textContent=S.sBpm;};sb.onchange=()=>savePrefs();}
   const r=document.getElementById('bpm');if(r)r.oninput=e=>{S.bpm=+e.target.value;document.getElementById('bpmv').textContent=S.bpm;if(MET.on){metroStop();metroStart();}};
@@ -3760,7 +4513,7 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,path,rect
   if(d.r2song!==undefined){const R=RECIPES[+d.r2song],bars=[];let cur=[],beats=0;R.ch.forEach(c=>{cur.push(enSym(c));beats+=(c[5]||4);if(beats>=4){bars.push(cur.join(' '));cur=[];beats=0;}});if(cur.length)bars.push(cur.join(' '));
     const song={id:'s'+Date.now(),title:R.title,artist:'Recette',version:'Depuis les Recettes',key:RK(),bpm:R.bpm,beatsPerBar:4,sections:[{name:'Grille',repeat:2,bars}],form:[],note:R.why,sources:[]};
     S.saved=[song,...S.saved].slice(0,50);persist();S.song=song;applyPrefs(song);stopAll();S.tab='songs';render();window.scrollTo(0,0);return;}
-  if(d.r2impro!==undefined){const R=RECIPES[+d.r2impro],list=R.ba?R.after:R.ch;S.imp.customR=list;S.imp.custom=true;S.imp.prog=list.map(c=>[rRom(c).r]);S.imp.syms=list.map(c=>[enSym(c)]);S.imp.melRaw=null;S.imp.mel=null;S.imp.g=({pop:'pop',emo:'pop',jazz:'jazz',city:'city',latin:'bossa',epic:'film',hack:'pop'})[R.cat]||'pop';stopAll();S.tab='impro';render();window.scrollTo(0,0);return;}
+  if(d.r2impro!==undefined){const R=RECIPES[+d.r2impro],list=R.ba?R.after:R.ch;S.imp.customR=list;S.imp.custom=true;S.imp.prog=list.map(c=>[rRom(c).r]);S.imp.syms=list.map(c=>[enSym(c)]);S.imp.melRaw=null;S.imp.mel=null;S.imp.g=({pop:'pop',emo:'pop',jazz:'jazz',city:'city',latin:'bossa',epic:'film',hack:'pop',screen:/donjon|victoire/.test(R.title)?'game':/cartoon|lydien/.test(R.title)?'cartoon':'anime'})[R.cat]||'pop';stopAll();S.tab='impro';render();window.scrollTo(0,0);return;}
   if(d.micmode){S.mic.mode=d.micmode;S.mic.msg='';S.mic.progI=0;S.mic.target=null;if(d.micmode!=='free')micNewTarget();keep(()=>{});return;}
   if(d.miclvl){S.mic.lvl=d.miclvl;S.mic.msg='';S.mic.progI=0;micNewTarget();keep(()=>{});return;}
   if(d.micmin!==undefined){S.mic.min=d.micmin==='1';S.mic.progI=0;S.mic.progN=0;micNewTarget();keep(()=>{});return;}
@@ -3820,14 +4573,18 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,path,rect
   if(d.simset!==undefined){stopAll();S.sim.mode='chord';S.sim.sel=d.simset.split(',').map(Number).filter(x=>!isNaN(x));const lo=Math.min(...S.sim.sel);S.sim.lo=Math.max(24,Math.min(48,Math.floor(lo/12)*12));S.sim.hi=S.sim.lo+35;S.tab='sim';render();window.scrollTo(0,0);return;}
   if(d.micset){stopAll();S.mic.mode='chord';S.mic.msg='';micCustomTarget(d.micset);S.tab='mic';render();window.scrollTo(0,0);return;}
   if(d.layout){S.layout=d.layout==='cycle'?'auto':d.layout;savePrefs();render();window.scrollTo(0,0);return;}
+  if(d.runt){S.run.type=d.runt;if(!RUNS[d.runt].dirs.includes(S.run.dir))S.run.dir=RUNS[d.runt].dirs[0];keep(()=>{});return;}
+  if(d.rund){S.run.dir=d.rund;keep(()=>{});return;}
+  if(d.runn){S.run.n=+d.runn;keep(()=>{});return;}
+  if(d.runs!==undefined){S.run.speed=+d.runs;keep(()=>{});return;}
   if(d.hands){S.hands=d.hands;stopAll();keep(()=>{});return;}
   if(d.msimpro!==undefined){const sec=S.song.sections[+d.msimpro],ch=sec.bars.flatMap(splitBar).slice(0,8);S.imp.customR=null;S.imp.customSyms=ch;S.imp.custom=true;S.imp.prog=ch.map(x=>[x]);S.imp.syms=ch.map(x=>[x]);S.imp.melRaw=null;S.imp.mel=null;stopAll();S.tab='impro';render();window.scrollTo(0,0);return;}
   if(d.sview){S.songView=d.sview;stopAll();if(d.sview!=='follow'&&S.mic.on)stopMic();keep(()=>{});return;}
   if(d.fmode){S.fol.mode=d.fmode;S.fol.run=true;S.fol.done=false;if(d.fmode!=='wait'&&S.mic.on)stopMic();keep(()=>{});return;}
-  if(d.fgran){S.fol.gran=d.fgran;folBuild();keep(()=>{});return;}
+  if(d.fgran){S.fol.gran=d.fgran;folBuild();if(S.fol.ev[0])S.fol.t=S.fol.ev[0].t-2;keep(()=>{});return;}
   if(d.fsec!==undefined){const F=S.fol;F.i=+d.fsec;F.t=F.ev[F.i].t-2;F.done=false;F.run=true;folReset();folText(true);return;}
   if(d.fctl){const F=S.fol,c=d.fctl;
-    if(c==='restart'){F.i=0;F.t=-3;F.ok=0;F.skip=0;F.done=false;F.run=true;folReset();}
+    if(c==='restart'){F.i=0;F.t=(F.ev[0]?F.ev[0].t:0)-2;F.ok=0;F.skip=0;F.done=false;F.run=true;folReset();}
     else if(c==='back'){F.i=Math.max(0,F.i-1);F.t=F.ev[F.i].t-1.2;F.done=false;F.run=true;folReset();}
     else if(c==='next'){if(F.ev[F.i]){if(F.mode==='step'){F.t=Math.max(F.t,F.ev[F.i].t);folAdvance();}else folAdvance('skip');}}
     else if(c==='toggle'){F.run=!F.run;if(F.done){F.i=0;F.t=-3;F.done=false;F.run=true;folReset();}keep(()=>{});return;}
@@ -3837,11 +4594,27 @@ document.addEventListener('click',e=>{const t=e.target.closest('button,path,rect
   if(d.msplay){const V=bestVoicing(d.msplay);if(V){PB.noCoach=1;play([...V.rh.map(m=>({rh:[m],d:.4,sus:2})),{lh:V.lh,rh:V.rh,d:2.5}],{bpm:90});}return;}
   if(d.mskeyset){const[t,m]=d.mskeyset.split(':');S.ped.songM[S.song.id].key={t:+t,min:m==='1',s:0};savePed();keep(()=>{});return;}
   if(d.mstempo){S.sBpm=Math.round((S.song.bpm||80)*+d.mstempo);savePrefs();keep(()=>{});return;}
-  if(d.mssec!==undefined){const song=S.song,arr=arrange(song),si=+d.mssec,st=[],svR=S.sRhy;if(hasScoreRhy(song))S.sRhy='score';(song.sections[si].bars||[]).forEach((_,bi)=>st.push(...barSteps(song,arr,si,bi)));S.sRhy=svR;play(st,{bpm:S.sBpm});return;}
-  if(d.mskey){const K=((S.ped.songM||{})[S.song.id]||{}).key||detectKey(S.song)[0];if(K){const L=K.min?MIN_KEYS:MAJ_KEYS,i=L.findIndex(x=>parse(x.t).pc===K.t);setGK(i,true);S.key={type:K.min?'min':'maj',i};S.tab='keys';stopAll();render();window.scrollTo(0,0);}return;}
+  if(d.mssec!==undefined){const song=S.song,arr=arrange(song),si=+d.mssec,st=[],svR=S.sRhy;if(hasScoreRhy(song))S.sRhy='score';if(song.notes)S.sRhy='notes';(song.sections[si].bars||[]).forEach((_,bi)=>st.push(...barSteps(song,arr,si,bi)));S.sRhy=svR;play(st,{bpm:S.sBpm});return;}
+  if(d.mskey){const K=((S.ped.songM||{})[S.song.id]||{}).key||S.song.kfix||detectKey(S.song)[0];if(K){const L=K.min?MIN_KEYS:MAJ_KEYS,i=L.findIndex(x=>parse(x.t).pc===K.t);setGK(i,true);S.key={type:K.min?'min':'maj',i};S.tab='keys';stopAll();render();window.scrollTo(0,0);}return;}
   if(d.qp){const ta=document.getElementById('sf_g');let v=ta?ta.value:(S.sf.g||'');const [kind,val]=d.qp.split(':');
     if(kind==='r'){v=(v&&!/[\s(|:/]$/.test(v)&&!S.qpSlash?v+' ':v)+val;S.qpSlash=false;}else if(kind==='q'){v+=val;}else if(kind==='slash'){v+='/';S.qpSlash=true;}else if(kind==='bar'){v+=' | ';}else if(kind==='sec'){v+=(v?'\n':'')+'Section: ';}else if(kind==='del'){v=v.replace(/\s*\S\s*$/,m=>m.trim().length>1?m.trim().slice(0,-1):'');}
     const g=id=>(document.getElementById(id)||{}).value;S.sf={...S.sf,t:g('sf_t')??S.sf.t,a:g('sf_a')??S.sf.a,k:g('sf_k')??S.sf.k,b:g('sf_b')??S.sf.b,g:v};keep(()=>{});const t2=document.getElementById('sf_g');if(t2){t2.scrollTop=t2.scrollHeight;}return;}
+  if(d.imdev!==undefined){S.im2.dev=+d.imdev;keep(()=>{});return;}
+  if(d.imtg){S.im2.tg=d.imtg;S.im2.tr=0;keep(()=>{});return;}
+  if(d.imtr!==undefined){S.im2.tr=+d.imtr;keep(()=>{});return;}
+  if(d.imie){S.im2.ie=d.imie;S.im2.ii=0;keep(()=>{});return;}
+  if(d.imii!==undefined){S.im2.ii=+d.imii;keep(()=>{});return;}
+  if(d.imlc){S.im2.lc=d.imlc;keep(()=>{});return;}
+  if(d.imtry!==undefined){const D=DEVICES[+d.imtry],o=gOffG(),ch=D.after.map(c=>{const p=parseChord(c[0]);if(!p||!o)return c[0];const m=c[0].match(/^([A-G][#b]?)(.*?)(?:\/([A-G][#b]?))?$/);const r=pcEn(mod(p.root+o),gFlat());return r+m[2]+(m[3]?'/'+pcEn(mod(p.bass+o),gFlat()):'');});
+    S.imp.customR=null;S.imp.customSyms=ch;S.imp.custom=true;S.imp.prog=ch.map(x=>[x]);S.imp.syms=ch.map(x=>[x]);S.imp.mel=null;S.imp.melRaw=null;stopAll();keep(()=>{});const el=document.querySelector('#imptop')||document.querySelector('.hero');if(el)el.scrollIntoView({block:'start'});window.scrollTo(0,0);return;}
+  if(d.voi!==undefined){S.vo.i=+d.voi;stopAll();keep(()=>{});window.scrollTo(0,0);return;}
+  if(d.vofeel){S.vo.feel=d.vofeel;keep(()=>{});return;}
+  if(d.vodrone!==undefined){PB.noCoach=1;const p=+d.vodrone;play([{lh:[48+p],rh:[60+p],d:3,sus:3}],{bpm:60});S.vo.drone=p;return;}
+  if(d.vochord){PB.noCoach=1;const p=S.vo.drone||0;play([{lh:[48+p],rh:[60+p,60+p+(d.vochord==='maj'?4:3),67+p],d:3,sus:3}],{bpm:60});return;}
+  if(d.hmi!==undefined){S.hm.i=+d.hmi;S.hm.pick=null;stopAll();keep(()=>{});window.scrollTo(0,0);return;}
+  if(d.hmpick!==undefined){if(S.hm.pick!==null)return;S.hm.pick=+d.hmpick;if(S.hm.pick===HARM[S.hm.i].q.a)addXP(5,'bonne réponse');keep(()=>{});return;}
+  if(d.impgo){stopAll();pickScore();return;}
+  if(d.fullopen){stopAll();openFull(d.fullopen);render();window.scrollTo(0,0);return;}
   if(d.memonext){S.memoI[S.tab]=(S.memoI[S.tab]||0)+1;keep(()=>{});return;}
   if(d.dgmin!==undefined){S.dg.min=d.dgmin==='1';S.dg.q=null;S.dg.qn=0;S.dg.qok=0;keep(()=>{});return;}
   if(d.dgsev!==undefined){S.dg.sev=d.dgsev==='1';keep(()=>{});return;}
@@ -3898,7 +4671,7 @@ const ACT={
     play(applyArp([...one,...one],S.arp).concat([{lh:[bass(sc[0].pc)],rh:[charN+12],d:4}]),{bpm:96,btn:b});},
   mChar(b){const{M,sc}=modeData();const r=60+sc[0].pc,c=stack([sc[0].pc,sc[M.ch].pc],60)[1];
     play([{lh:[bass(sc[0].pc)],rh:[r,r+(MODES[S.mode].ints[2])],d:1.5,sus:4},{rh:[c+12],d:2.5}],{bpm:80,btn:b});},
-  msScale(b){const K=((S.ped.songM||{})[S.song.id]||{}).key||detectKey(S.song)[0];if(!K)return;const L=K.min?MIN_KEYS:MAJ_KEYS,e=L.find(x=>parse(x.t).pc===K.t),sc=spell(e.t,K.min?MIN:MAJ),m=stack(sc.map(n=>n.pc),60);m.push(m[0]+12);play([...m,...m.slice(0,-1).reverse()].map(x=>({rh:[x],d:.5})),{bpm:100,btn:b});},
+  msScale(b){const K=((S.ped.songM||{})[S.song.id]||{}).key||S.song.kfix||detectKey(S.song)[0];if(!K)return;const L=K.min?MIN_KEYS:MAJ_KEYS,e=L.find(x=>parse(x.t).pc===K.t),sc=spell(e.t,K.min?MIN:MAJ),m=stack(sc.map(n=>n.pc),60);m.push(m[0]+12);play([...m,...m.slice(0,-1).reverse()].map(x=>({rh:[x],d:.5})),{bpm:100,btn:b});},
   msDrill(){const U=songUniq(S.song),u=U[Math.floor(Math.random()*U.length)].c,c=parseChord(u),pcs=[...new Set(c.ints.map(i=>mod(c.root+i)))],fifth=mod(c.root+7);
     S.ms.drill={sym:u,pcs,opt:pcs.length>=4&&pcs.includes(fifth)?[fifth]:[],optN:nm(parse((gFlat()?FLAT:SHARP)[fifth])),names:pcs.map(p=>nm(parse((gFlat()?FLAT:SHARP)[p]))),sel:[],done:false};keep(()=>{});},
   msClear(){S.ms.drill.sel=[];keep(()=>{});},
@@ -3912,7 +4685,10 @@ const ACT={
     const song={id:'s'+Date.now(),title:S.sf.t.trim(),artist:S.sf.a.trim(),version:'Grille saisie à la main',key,bpm:Math.min(160,Math.max(40,+S.sf.b||80)),beatsPerBar:4,sections,form:[],note:'',sources:[]};
     S.saved=[song,...S.saved].slice(0,50);persist();S.song=song;applyPrefs(song);S.songForm=false;S.sf={};keep(()=>{});},
   micStart(){startMic();},
-  msPent(b){const K=((S.ped.songM||{})[S.song.id]||{}).key||detectKey(S.song)[0];const L=K.min?MIN_KEYS:MAJ_KEYS,e=L.find(x=>parse(x.t).pc===K.t),sc=spell(e.t,K.min?MIN:MAJ),idx=K.min?[0,2,3,4,6]:[0,1,2,4,5],m=stack(idx.map(i=>sc[i].pc),60);m.push(m[0]+12);PB.noCoach=1;play([...m,...m.slice(0,-1).reverse()].map(x=>({rh:[x],d:.5})),{bpm:110,btn:b});},
+  msPent(b){const K=((S.ped.songM||{})[S.song.id]||{}).key||S.song.kfix||detectKey(S.song)[0];const L=K.min?MIN_KEYS:MAJ_KEYS,e=L.find(x=>parse(x.t).pc===K.t),sc=spell(e.t,K.min?MIN:MAJ),idx=K.min?[0,2,3,4,6]:[0,1,2,4,5],m=stack(idx.map(i=>sc[i].pc),60);m.push(m[0]+12);PB.noCoach=1;play([...m,...m.slice(0,-1).reverse()].map(x=>({rh:[x],d:.5})),{bpm:110,btn:b});},
+  voDone(){if(!S.vo.ok.includes(S.vo.i)){S.vo.ok.push(S.vo.i);addXP(10,'étape comprise');}S.ped.voice=S.vo.ok;savePed();keep(()=>{});},
+  hmDone(){S.ped.harm=S.ped.harm||[];if(!S.ped.harm.includes(S.hm.i)){S.ped.harm.push(S.hm.i);addXP(20,'chapitre terminé');}savePed();keep(()=>{});},
+  hmRetry(){S.hm.pick=null;keep(()=>{});},
   folMic(){S.mic.mode='free';S.mic.target=null;startMic();},
   folCalib(){S.mic.calibUntil=performance.now()+1500;S.mic.calSum=0;S.mic.calN=0;pedToast('🤫 Silence 1,5 seconde…');},
   simPlay(){const sel=S.sim.sel;PB.noCoach=1;play([{lh:sel.filter(x=>x<60),rh:sel.filter(x=>x>=60),d:3}],{bpm:80});},
